@@ -581,18 +581,19 @@
                           TransactionManager.toggleSelectAll(this.checked)
                         " />
                   </th>
-                  <th style="width: 50px">#</th>
+                  <th style="width: 50px" class="hide-mobile">#</th>
                   <th style="width: 100px; cursor: pointer" onclick="TransactionManager.handleSort('Date')"
                     role="button" tabindex="0" aria-label="Sort by Date">
                     Date <i class="fa-solid fa-sort"></i>
                   </th>
-                  <th style="width: 60px; text-align: center">Type</th>
+                  <th style="width: 60px; text-align: center" class="hide-mobile">Type</th>
                   <th style="cursor: pointer" onclick="TransactionManager.handleSort('Description')" role="button"
                     tabindex="0" aria-label="Sort by Description">
                     Description <i class="fa-solid fa-sort"></i>
                   </th>
-                  <th style="width: 120px; cursor: pointer" onclick="TransactionManager.handleSort('Category')"
-                    role="button" tabindex="0" aria-label="Sort by Category">
+                  <th style="width: 120px; cursor: pointer" class="hide-mobile"
+                    onclick="TransactionManager.handleSort('Category')" role="button" tabindex="0"
+                    aria-label="Sort by Category">
                     Category <i class="fa-solid fa-sort"></i>
                   </th>
                   <th style="text-align: right; width: 120px; cursor: pointer"

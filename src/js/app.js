@@ -1938,6 +1938,27 @@ const UIManager = {
                 }
             });
         });
+
+        // --- Universal Resize Handling ---
+        window.addEventListener('resize', Utils.debounce(() => {
+            ['mainChart', 'trendChart', 'catChart'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el && el.data) Plotly.Plots.resize(el);
+            });
+        }, 100));
+
+        // Resize on Sidebar Toggle
+        const observer = new MutationObserver(() => {
+            setTimeout(() => {
+                ['mainChart', 'trendChart', 'catChart'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el && el.data) Plotly.Plots.resize(el);
+                });
+            }, 305); // Wait for CSS transition
+        });
+
+        const sb = document.querySelector('.sidebar');
+        if (sb) observer.observe(sb, { attributes: true, attributeFilter: ['class'] });
     },
 
     switchView(viewId, navBtn) {
@@ -2153,9 +2174,9 @@ const UIManager = {
                     <td>
                         <input type="checkbox" class="row-checkbox" data-id="${r.id}" ${isSelected ? 'checked' : ''} onchange="TransactionManager.toggleSelection('${r.id}')">
                     </td>
-                    <td class="cell-index">${(TransactionManager.state.pagination.currentPage - 1) * TransactionManager.state.pagination.itemsPerPage + i + 1}</td>
+                    <td class="cell-index hide-mobile">${(TransactionManager.state.pagination.currentPage - 1) * TransactionManager.state.pagination.itemsPerPage + i + 1}</td>
                     <td style="white-space:nowrap">${r.parsedDate ? new Date(r.parsedDate).toLocaleDateString() : '-'}</td>
-                    <td>
+                    <td class="hide-mobile">
                         <div class="grid-type-icon ${r.parsedCredit > 0 ? 'type-in' : 'type-out'}">
                             <i class="fa-solid ${r.parsedCredit > 0 ? 'fa-arrow-down' : 'fa-arrow-up'}"></i>
                         </div>
@@ -2175,7 +2196,7 @@ const UIManager = {
                             </div>
                         </div>
                     </td>
-                    <td><span class="grid-badge">${Utils.escapeHtml(r.category)}</span></td>
+                    <td class="hide-mobile"><span class="grid-badge">${Utils.escapeHtml(r.category)}</span></td>
                     <td class="cell-amount" style="color:var(--danger)">${r.parsedDebit ? '-' + Utils.formatCurrency(r.parsedDebit) : ''}</td>
                     <td class="cell-amount" style="color:var(--success)">${r.parsedCredit ? '+' + Utils.formatCurrency(r.parsedCredit) : ''}</td>
                     <td>

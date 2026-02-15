@@ -1581,4 +1581,139 @@ button:focus,
     #creditCardSection>div:last-child {
         grid-template-columns: 1fr 1fr;
     }
+
+    /* 6. TABLE & UTILITY VISIBILITY */
+    .hide-mobile {
+        display: none !important;
+    }
+
+    /* Fix Filter Bar Wrapping */
+    .filter-bar {
+        height: auto;
+        overflow: visible;
+    }
+
+    .filter-group {
+        flex-wrap: wrap;
+    }
+
+    /* Ensure Installment/Reset buttons are visible */
+    button[data-action="filter-preset"][data-payload="installments"],
+    button[data-action="filter-reset"] {
+        display: inline-flex !important;
+        flex: 1 0 auto;
+        /* Allow them to grow/shrink but not disappear */
+    }
+
+    /* Table Compactness */
+    td {
+        padding: 8px !important;
+        font-size: 0.75rem !important;
+    }
+
+    .cell-amount {
+        font-size: 0.8rem !important;
+    }
+
+    /* Description Trunctation */
+    td:nth-child(5) div {
+        /* The flex container in description cell */
+        max-width: 120px;
+        /* Force truncation width */
+    }
+}
+
+/* --- UNIVERSAL & LARGE SCREEN SUPPORTS --- */
+@media (min-width: 1601px) {
+    .layout {
+        max-width: 1600px;
+        margin: 0 auto;
+        border-left: 1px solid var(--border);
+        border-right: 1px solid var(--border);
+        box-shadow: 0 0 50px rgba(0, 0, 0, 0.05);
+    }
+
+    .bg-mesh {
+        width: 100%;
+        max-width: 1600px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+}
+
+/* --- TABLET REFINEMENTS (769px - 1024px) --- */
+@media screen and (min-width: 769px) and (max-width: 1024px) {
+    .metrics-row {
+        gap: 16px;
+        padding: 20px;
+    }
+
+    .metric-value {
+        font-size: 1.6rem;
+    }
+
+    .card p {
+        font-size: 1.5rem;
+    }
+
+    /* Ensure Charts don't overflow */
+    .charts-grid {
+        grid-template-columns: 1fr;
+        /* Stack charts on portrait tablet */
+    }
+
+    .dual-grid {
+        grid-template-columns: 1fr 1fr;
+        /* Maintain grid but potentially tighter */
+    }
+}
+
+/* --- MOBILE MODAL & TOUCH OPTIMIZATIONS --- */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95% !important;
+        max-height: 90vh;
+        overflow-y: auto;
+        padding: 20px !important;
+    }
+
+    /* Touch Targets */
+    button,
+    .nav-item,
+    .nav-tab {
+        min-height: 44px;
+        /* Standard touch target */
+        display: flex;
+        align-items: center;
+    }
+
+    /* Ensure all interactions are visible without hover */
+    .cmd-item .cmd-desc {
+        opacity: 0.9 !important;
+    }
+
+    /* Make Action Buttons bigger */
+    td button {
+        padding: 8px 12px !important;
+        font-size: 1rem !important;
+        /* Larger icon */
+    }
+}
+
+/* --- TINY SCREENS (<360px) --- */
+@media (max-width: 359px) {
+    .metric-value {
+        font-size: 1.2rem;
+    }
+
+    .page-title h1 {
+        font-size: 1rem;
+    }
+
+    .nav-tab {
+        font-size: 0.8rem;
+        padding: 10px 0;
+    }
+
+    /* Hide even more columns if absolutely necessary, or scroll */
 }

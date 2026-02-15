@@ -503,6 +503,48 @@ tr:hover td {
     border-color: var(--border-hover);
 }
 
+/* Accessibility: visible focus states and skip link */
+.skip-link {
+    position: absolute;
+    left: -999px;
+    top: auto;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    z-index: 9999;
+}
+.skip-link:focus {
+    left: 12px;
+    top: 12px;
+    width: auto;
+    height: auto;
+    padding: 8px 12px;
+    background: var(--accent);
+    color: white;
+    border-radius: 6px;
+    text-decoration: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* Focus outlines for keyboard users */
+button:focus,
+.primary-btn:focus,
+.secondary-btn:focus,
+[role="button"]:focus,
+.nav-item:focus,
+.nav-tab:focus,
+.date-input:focus,
+.search-box input:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.18);
+    border-radius: 8px;
+}
+
+/* Use focus-visible where supported to avoid mouse focus rings */
+:focus:not(:focus-visible) {
+    box-shadow: none !important;
+}
+
 /* MODALS */
 .modal {
     position: fixed;

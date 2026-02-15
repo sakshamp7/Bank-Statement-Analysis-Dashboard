@@ -32,6 +32,41 @@ const CONFIG = {
     }
 };
 
+// --- Accessibility enhancements ---
+(function(){
+    document.addEventListener('keydown', function(e){
+        const el = document.activeElement;
+        if (!el) return;
+        const role = el.getAttribute && el.getAttribute('role');
+
+        // Activate Enter/Space for elements with role="button"
+        if ((e.key === 'Enter' || e.key === ' ') && role === 'button') {
+            e.preventDefault();
+            try { el.click && el.click(); } catch (err) {}
+            el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        }
+
+        // Left/Right arrow navigation for tab-like controls
+        if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && el.classList && el.classList.contains('nav-tab')) {
+            const nav = el.parentElement;
+            if (!nav) return;
+            const items = Array.from(nav.querySelectorAll('.nav-tab'));
+            const idx = items.indexOf(el);
+            let next = idx;
+            if (e.key === 'ArrowRight') next = (idx + 1) % items.length;
+            if (e.key === 'ArrowLeft') next = (idx - 1 + items.length) % items.length;
+            items[next].focus();
+        }
+    });
+
+    // Ensure role=button elements also respond on keyup for compatibility
+    document.querySelectorAll('.nav-item[role="button"], .nav-tab[role="button"]').forEach(el=>{
+        el.addEventListener('keyup', function(e){
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.click(); }
+        });
+    });
+})();
+
 // --- UTILITIES ---
 const Utils = {
     escapeHtml: (text) => {

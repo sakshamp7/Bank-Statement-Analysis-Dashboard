@@ -33,8 +33,8 @@ const CONFIG = {
 };
 
 // --- Accessibility enhancements ---
-(function(){
-    document.addEventListener('keydown', function(e){
+(function () {
+    document.addEventListener('keydown', function (e) {
         const el = document.activeElement;
         if (!el) return;
         const role = el.getAttribute && el.getAttribute('role');
@@ -42,7 +42,7 @@ const CONFIG = {
         // Activate Enter/Space for elements with role="button"
         if ((e.key === 'Enter' || e.key === ' ') && role === 'button') {
             e.preventDefault();
-            try { el.click && el.click(); } catch (err) {}
+            try { el.click && el.click(); } catch (err) { }
             el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
         }
 
@@ -60,8 +60,8 @@ const CONFIG = {
     });
 
     // Ensure role=button elements also respond on keyup for compatibility
-    document.querySelectorAll('.nav-item[role="button"], .nav-tab[role="button"]').forEach(el=>{
-        el.addEventListener('keyup', function(e){
+    document.querySelectorAll('.nav-item[role="button"], .nav-tab[role="button"]').forEach(el => {
+        el.addEventListener('keyup', function (e) {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.click(); }
         });
     });
@@ -1906,7 +1906,7 @@ const UIManager = {
             });
         });
 
-    this.els.datasetList.addEventListener('change', e => {
+        this.els.datasetList.addEventListener('change', e => {
             if (e.target.value) TransactionManager.switchDataset(e.target.value);
         });
 
@@ -1929,10 +1929,10 @@ const UIManager = {
             });
         }
 
-        // Close sidebar on nav click (mobile)
+        // Close sidebar on nav click (mobile & tablet)
         this.els.navItems.forEach(n => {
             n.addEventListener('click', () => {
-                if (window.innerWidth <= 768) {
+                if (window.innerWidth <= 1024) {
                     sidebar.classList.remove('active');
                     overlay.classList.remove('active');
                 }

@@ -75,9 +75,9 @@ const Utils = {
     },
     generateId: () => '_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36),
 
-    // Generates a deterministic ID based on content to prevent duplicates
-    generateRowId: (r, index) => {
-        const str = `${r.Date}|${r.Description}|${r.Debit}|${r.Credit}|${index}`;
+    // Generates a deterministic ID based on content to prevent duplicates within a file
+    generateRowId: (r, index, salt = '') => {
+        const str = `${r.Date}|${r.Description}|${r.Debit}|${r.Credit}|${index}|${salt}`;
         let hash = 0;
         for (let i = 0; i < str.length; i++) {
             const char = str.charCodeAt(i);
@@ -86,6 +86,19 @@ const Utils = {
         }
         return 'tx_' + Math.abs(hash).toString(36) + index;
     },
+
+    // Tagged template for safe HTML construction
+    html: (strings, ...values) => {
+        return strings.reduce((prev, curr, i) => {
+            let val = values[i] !== undefined ? values[i] : '';
+            // If the value is already marked as safe, don't escape
+            if (val && val.__isSafe) val = val.content;
+            else val = Utils.escapeHtml(val);
+            return prev + curr + val;
+        }, '');
+    },
+
+    safe: (content) => ({ content, __isSafe: true }),
 
 
 
@@ -427,10 +440,54 @@ const RulesManager = {
     categorize(desc) {
         const d = String(desc).toLowerCase();
         for (const [cat, keywords] of Object.entries(this.state.categories)) {
-            if (keywords.some(k => d.includes(k))) return cat;
+            if (keywords.some(k => {
+                if (k.startsWith('re:')) {
+                    try {
+                        const pattern = new RegExp(k.substring(3), 'i');
+                        return pattern.test(d);
+                    } catch (e) {
+                        console.warn("Invalid regex:", k);
+                        return false;
+                    }
+                }
+                const lowK = k.toLowerCase();
+                // Direct match
+                if (d.includes(lowK)) return true;
+                // Fuzzy Match: If keyword is 5+ chars and matches with minimal distance
+                if (lowK.length >= 5 && this.isFuzzyMatch(d, lowK)) return true;
+                return false;
+            })) return cat;
         }
         if (d.includes("atm") || d.includes("cash")) return "Cash Withdrawal";
         return "Misc";
+    },
+
+    isFuzzyMatch(s1, s2) {
+        // Very simple fuzzy: check if all words of s2 are in s1 or similar
+        const words2 = s2.split(/\s+/);
+        return words2.every(w => {
+            if (s1.includes(w)) return true;
+            // Basic Jaro-Winkler or just check for 1 char difference if >= 4 chars
+            if (w.length < 4) return false;
+            // Check for 1 char edit distance
+            return this.levenshtein(s1, w) <= 1; // This is slow on whole string s1, better to check against words of s1
+        });
+    },
+
+    levenshtein(s, t) {
+        if (!s.length) return t.length;
+        if (!t.length) return s.length;
+        const arr = [];
+        for (let i = 0; i <= t.length; i++) { arr[i] = [i]; }
+        for (let j = 0; j <= s.length; j++) { arr[0][j] = j; }
+        for (let i = 1; i <= t.length; i++) {
+            for (let j = 1; j <= s.length; j++) {
+                arr[i][j] = t.charAt(i - 1) === s.charAt(j - 1)
+                    ? arr[i - 1][j - 1]
+                    : Math.min(arr[i - 1][j - 1] + 1, arr[i][j - 1] + 1, arr[i - 1][j] + 1);
+            }
+        }
+        return arr[t.length][s.length];
     },
 
     isKnownPerson(desc) {
@@ -601,8 +658,8 @@ const TransactionManager = {
                     const pDate = Utils.parseDate(mapped.Date);
                     const cat = RulesManager.categorize(mapped.Description);
 
-                    // Use deterministic ID for deduplication
-                    const stableId = Utils.generateRowId(mapped, index);
+                    // Use deterministic ID for deduplication with filename as salt
+                    const stableId = Utils.generateRowId(mapped, index, file.name);
 
                     return {
                         ...mapped,
@@ -654,7 +711,7 @@ const TransactionManager = {
             const recurring = this.detectRecurring(rows);
             const predictions = this.predict(stats.monthly);
 
-            UIManager.update(stats, rows, recurring);
+            UIManager.update(stats, rows, predictions, recurring);
             ChartManager.render(stats, predictions);
 
         } catch (err) {
@@ -822,13 +879,42 @@ const TransactionManager = {
     },
 
     detectAnomalies(rows, catTotals) {
-        // Calculate average per category count isn't readily available in totals,
-        // let's just flag high value (> 5000) for now as simple "High Value" logic exists.
-        // True anomaly detection requires mean/stddev per category.
-        // Let's implement a simpler rule: Transaction > 30% of Total Income (if income exists) OR > 10,000
-        const threshold = 10000;
+        if (!rows.length) return;
+
+        // Group amounts by category for statistical analysis
+        const catAmounts = {};
         rows.forEach(r => {
-            if (r.parsedDebit > threshold) r.isAnomaly = true;
+            if (r.parsedDebit > 0) {
+                if (!catAmounts[r.category]) catAmounts[r.category] = [];
+                catAmounts[r.category].push(r.parsedDebit);
+            }
+        });
+
+        // Calculate IQR for each category
+        const catOutlierBounds = {};
+        for (const [cat, amounts] of Object.entries(catAmounts)) {
+            if (amounts.length < 4) {
+                // Not enough data for IQR, fallback to simple threshold (e.g., 2x median or fixed 10k)
+                const sorted = [...amounts].sort((a, b) => a - b);
+                const median = sorted[Math.floor(sorted.length / 2)];
+                catOutlierBounds[cat] = Math.max(median * 3, 10000); // 3x median or 10k
+                continue;
+            }
+
+            const sorted = [...amounts].sort((a, b) => a - b);
+            const q1 = sorted[Math.floor(sorted.length * 0.25)];
+            const q3 = sorted[Math.floor(sorted.length * 0.75)];
+            const iqr = q3 - q1;
+            catOutlierBounds[cat] = q3 + (1.5 * iqr);
+        }
+
+        rows.forEach(r => {
+            const threshold = catOutlierBounds[r.category] || 10000;
+            // Mark as anomaly if it's significantly higher than normal for its category
+            if (r.parsedDebit > threshold) {
+                r.isAnomaly = true;
+                r.outlierThreshold = threshold;
+            }
         });
     },
 
@@ -873,15 +959,22 @@ const TransactionManager = {
         const keys = Object.keys(monthly).sort();
         if (keys.length < 3) return null;
 
-        // Simple moving average
+        // Weighted moving average (more weight to recent months)
         const recent = keys.slice(-3);
-        const avgIncome = recent.reduce((sum, k) => sum + monthly[k].income, 0) / 3;
-        const avgExpense = recent.reduce((sum, k) => sum + monthly[k].expense, 0) / 3;
+        const weights = [1, 2, 3]; // Total weight = 6
+        const totalWeight = weights.reduce((a, b) => a + b, 0);
+
+        const avgIncome = recent.reduce((sum, k, i) => sum + (monthly[k].income * weights[i]), 0) / totalWeight;
+        const avgExpense = recent.reduce((sum, k, i) => sum + (monthly[k].expense * weights[i]), 0) / totalWeight;
+
+        // Simple trend detection
+        const trend = (monthly[recent[2]].net - monthly[recent[0]].net) / 2;
 
         return {
             nextMonthIncome: avgIncome,
             nextMonthExpense: avgExpense,
-            nextMonthNet: avgIncome - avgExpense
+            nextMonthNet: avgIncome - avgExpense,
+            trend: trend > 0 ? 'Improving' : 'Declining'
         };
     },
 
@@ -1080,7 +1173,8 @@ const TransactionManager = {
             // Update UI
             const stats = this.analyze(rows);
             const recurring = this.detectRecurring(rows);
-            UIManager.update(stats, rows, recurring);
+            const predictions = this.predict(stats.monthly);
+            UIManager.update(stats, rows, predictions, recurring);
         } catch (err) {
             console.error("Sort Error:", err);
             UIManager.showToast("Sort failed: " + err.message, "error");
@@ -1127,7 +1221,8 @@ const TransactionManager = {
 
             const stats = this.analyze(this.state.filteredRows);
             const recurring = this.detectRecurring(this.state.filteredRows);
-            UIManager.update(stats, this.state.filteredRows, recurring);
+            const predictions = this.predict(stats.monthly);
+            UIManager.update(stats, this.state.filteredRows, predictions, recurring);
 
             UIManager.showToast(`Deleted ${ids.length} transactions`, "success");
 
@@ -1150,13 +1245,21 @@ const TransactionManager = {
 
     toggleSelectAll(checked) {
         if (checked) {
-            // Only select visible rows on current page? Or all filtered?
-            // UX Best Practice: Select all currently filtered rows
+            // Select all current filtered rows (not just visible on page)
             this.state.filteredRows.forEach(r => this.state.selectedIds.add(r.id));
         } else {
             this.state.selectedIds.clear();
         }
-        UIManager.update(this.analyze(this.state.filteredRows), this.state.filteredRows, null); // Re-render table
+        // Instead of re-processing everything, just update the UI
+        UIManager.updateSelectionUI();
+        // Since rows might span multiple pages, we don't necessarily re-render the whole table here 
+        // if performance is an issue, but for < 1000 rows it's fine.
+        // To be safe, let's just re-render current page
+        const start = (this.state.pagination.currentPage - 1) * this.state.pagination.itemsPerPage;
+        const end = start + this.state.pagination.itemsPerPage;
+        UIManager.renderTable(this.state.filteredRows.slice(start, end));
+
+        UIManager.showToast(checked ? `Selected ${this.state.selectedIds.size} transactions` : "Selection cleared", "info");
     },
 
     exportCSV() {
@@ -1194,31 +1297,58 @@ const ChartManager = {
     },
 
     renderMainChart(monthly, predictions) {
-        const labels = Object.keys(monthly).sort();
-        const income = labels.map(k => monthly[k].income);
-        const expense = labels.map(k => monthly[k].expense);
-        const net = labels.map(k => monthly[k].net);
+        try {
+            const labels = Object.keys(monthly).sort();
+            const income = labels.map(k => monthly[k].income);
+            const expense = labels.map(k => monthly[k].expense);
+            const net = labels.map(k => monthly[k].net);
 
-        const trace1 = { x: labels, y: income, type: 'area', name: 'Income', line: { color: '#10b981', shape: 'spline' }, fill: 'tozeroy' };
-        const trace2 = { x: labels, y: expense, type: 'area', name: 'Expense', line: { color: '#ef4444', shape: 'spline' }, fill: 'tozeroy' };
-        const trace3 = { x: labels, y: net, type: 'scatter', mode: 'lines+markers', name: 'Net Flow', line: { color: '#6366f1', width: 3 } };
+            const traces = [
+                { x: labels, y: income, type: 'area', name: 'Income', line: { color: '#10b981', shape: 'spline' }, fill: 'tozeroy' },
+                { x: labels, y: expense, type: 'area', name: 'Expense', line: { color: '#ef4444', shape: 'spline' }, fill: 'tozeroy' },
+                { x: labels, y: net, type: 'scatter', mode: 'lines+markers', name: 'Net Flow', line: { color: '#6366f1', width: 3 } }
+            ];
 
-        const layout = {
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)',
-            font: { family: 'Inter, sans-serif' },
-            margin: { t: 20, l: 40, r: 20, b: 40 },
-            showlegend: true,
-            legend: { orientation: 'h', y: -0.2 },
-            xaxis: { gridcolor: 'rgba(200,200,200,0.1)' },
-            yaxis: { gridcolor: 'rgba(200,200,200,0.1)' }
-        };
+            if (predictions) {
+                // Determine the next month label
+                const lastKey = labels[labels.length - 1];
+                const lastDate = new Date(lastKey + "-01");
+                lastDate.setMonth(lastDate.getMonth() + 1);
+                const nextLabel = `${lastDate.getFullYear()}-${String(lastDate.getMonth() + 1).padStart(2, '0')}`;
 
-        if (predictions) {
-            // Add prediction point
+                // Projected Points
+                traces.push({
+                    x: [labels[labels.length - 1], nextLabel],
+                    y: [income[income.length - 1], predictions.nextMonthIncome],
+                    type: 'scatter', mode: 'lines', name: 'Forecast Income',
+                    line: { color: '#10b981', dash: 'dot', width: 2 },
+                    showlegend: false
+                });
+                traces.push({
+                    x: [labels[labels.length - 1], nextLabel],
+                    y: [expense[expense.length - 1], predictions.nextMonthExpense],
+                    type: 'scatter', mode: 'lines', name: 'Forecast Expense',
+                    line: { color: '#ef4444', dash: 'dot', width: 2 },
+                    showlegend: false
+                });
+            }
+
+            const layout = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { family: 'Inter, sans-serif' },
+                margin: { t: 20, l: 40, r: 20, b: 40 },
+                showlegend: true,
+                legend: { orientation: 'h', y: -0.2 },
+                xaxis: { gridcolor: 'rgba(200,200,200,0.1)' },
+                yaxis: { gridcolor: 'rgba(200,200,200,0.1)' }
+            };
+
+            Plotly.newPlot('mainChart', traces, layout, { displayModeBar: false, responsive: true });
+        } catch (err) {
+            console.error("Main Chart Render Error:", err);
+            document.getElementById('mainChart').innerHTML = `<div class="chart-error">Chart Rendering Error: ${err.message}</div>`;
         }
-
-        Plotly.newPlot('mainChart', [trace1, trace2, trace3], layout, { displayModeBar: false, responsive: true });
     },
 
     renderCategoryChart(catData) {
@@ -1259,16 +1389,21 @@ const ChartManager = {
 
         const config = { displayModeBar: false, responsive: true };
 
-        Plotly.newPlot('catChart', [trace], layout, config).then(gd => {
-            gd.on('plotly_click', (data) => {
-                const cat = data.points[0].label;
-                UIManager.showToast(`Filtering by ${cat}...`, 'info');
-                // Switch to Reports and filter
-                UIManager.switchView('reportsView');
-                TransactionManager.filter({ query: cat });
-                document.getElementById('filterSearch').value = cat;
+        try {
+            Plotly.newPlot('catChart', [trace], layout, config).then(gd => {
+                gd.on('plotly_click', (data) => {
+                    const cat = data.points[0].label;
+                    UIManager.showToast(`Filtering by ${cat}...`, 'info');
+                    // Switch to Reports and filter
+                    UIManager.switchView('reportsView');
+                    TransactionManager.filter({ query: cat });
+                    document.getElementById('filterSearch').value = cat;
+                });
             });
-        });
+        } catch (err) {
+            console.error("Category Chart Render Error:", err);
+            document.getElementById('catChart').innerHTML = `<div class="chart-error">${err.message}</div>`;
+        }
 
         // Render Side-by-Side Table
         const total = values.reduce((a, b) => a + b, 0);
@@ -1318,7 +1453,12 @@ const ChartManager = {
             yaxis: { gridcolor: 'rgba(200,200,200,0.1)' }
         };
 
-        Plotly.newPlot('trendChart', [trace], layout, { displayModeBar: false, responsive: true });
+        try {
+            Plotly.newPlot('trendChart', [trace], layout, { displayModeBar: false, responsive: true });
+        } catch (err) {
+            console.error("Trend Chart Render Error:", err);
+            document.getElementById('trendChart').innerHTML = `<div class="chart-error">${err.message}</div>`;
+        }
     }
 };
 
@@ -1992,7 +2132,7 @@ const UIManager = {
     },
 
 
-    update(stats, rows, recurring) {
+    update(stats, rows, predictions, recurring) {
         // Update KPIs
         this.animateValue(this.els.adm, stats.admissions);
         this.animateValue(this.els.inst, stats.installments);
@@ -2065,6 +2205,25 @@ const UIManager = {
         this.generateInsights(stats, recurring);
         this.renderVariance(stats.variance);
         this.renderBudget(stats.categoryData);
+
+        // Update Forecast Card
+        const nextIncEl = document.getElementById('nextIncome');
+        const nextExpEl = document.getElementById('nextExpense');
+        const forecastInsightEl = document.getElementById('forecastInsight');
+        const trendBadge = document.getElementById('forecastTrendBadge');
+
+        if (predictions) {
+            this.animateValue(nextIncEl, predictions.nextMonthIncome, true);
+            this.animateValue(nextExpEl, predictions.nextMonthExpense, true);
+            if (forecastInsightEl) {
+                forecastInsightEl.innerHTML = `Based on a 3-month weighted average, your financial trend is <strong style="color:${predictions.trend === 'Improving' ? 'var(--success)' : 'var(--danger)'}">${predictions.trend}</strong>. Next month's net cash flow is estimated at <strong>${Utils.formatCurrency(predictions.nextMonthNet)}</strong>.`;
+            }
+            if (trendBadge) {
+                trendBadge.textContent = predictions.trend;
+                trendBadge.style.background = predictions.trend === 'Improving' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
+                trendBadge.style.color = predictions.trend === 'Improving' ? 'var(--success)' : 'var(--danger)';
+            }
+        }
 
 
 
@@ -2160,21 +2319,24 @@ const UIManager = {
         if (!this.els.tableBody) return;
 
         if (rows.length === 0) {
-            this.els.tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:2rem; color:var(--text-muted);">No matching records found.</td></tr>`;
+            this.els.tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:2rem; color:var(--text-muted);">No matching records found.</td></tr>`;
             return;
         }
+
+        const startIdx = (TransactionManager.state.pagination.currentPage - 1) * TransactionManager.state.pagination.itemsPerPage;
 
         this.els.tableBody.innerHTML = rows.map((r, i) => {
             const cleanName = Utils.cleanDesc(r.Description);
             const icon = Utils.getIconForDescription(r.Description);
             const isSelected = TransactionManager.state.selectedIds.has(r.id);
+            const isOutlier = r.isAnomaly;
 
-            return `
-                <tr class="${isSelected ? 'selected-row' : ''}">
+            return Utils.html`
+                <tr class="${isSelected ? 'selected-row' : ''} ${isOutlier ? 'anomaly-row' : ''}" style="${isOutlier ? 'background: rgba(239, 68, 68, 0.02);' : ''}">
                     <td>
                         <input type="checkbox" class="row-checkbox" data-id="${r.id}" ${isSelected ? 'checked' : ''} onchange="TransactionManager.toggleSelection('${r.id}')">
                     </td>
-                    <td class="cell-index hide-mobile">${(TransactionManager.state.pagination.currentPage - 1) * TransactionManager.state.pagination.itemsPerPage + i + 1}</td>
+                    <td class="cell-index hide-mobile">${startIdx + i + 1}</td>
                     <td style="white-space:nowrap">${r.parsedDate ? new Date(r.parsedDate).toLocaleDateString() : '-'}</td>
                     <td class="hide-mobile">
                         <div class="grid-type-icon ${r.parsedCredit > 0 ? 'type-in' : 'type-out'}">
@@ -2187,18 +2349,29 @@ const UIManager = {
                                 <i class="fa-solid ${icon}"></i>
                             </div>
                             <div style="display:flex; flex-direction:column; overflow:hidden;">
-                                <span style="font-weight:600; font-size:0.85rem; color:var(--text-main); text-transform:capitalize; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${Utils.escapeHtml(r.Description)}">
-                                    ${Utils.escapeHtml(cleanName)}
-                                </span>
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <span style="font-weight:600; font-size:0.85rem; color:var(--text-main); text-transform:capitalize; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${r.Description}">
+                                        ${cleanName}
+                                    </span>
+                                    ${isOutlier ? Utils.safe('<span class="outlier-tag" title="Statistical outlier detected for this category"><i class="fa-solid fa-circle-exclamation"></i> Outlier</span>') : ''}
+                                </div>
                                 <span style="font-size:0.7rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:0.7;">
-                                    ${Utils.escapeHtml(r.Description)}
+                                    ${r.Description}
                                 </span>
                             </div>
                         </div>
                     </td>
-                    <td class="hide-mobile"><span class="grid-badge">${Utils.escapeHtml(r.category)}</span></td>
-                    <td class="cell-amount" style="color:var(--danger)">${r.parsedDebit ? '-' + Utils.formatCurrency(r.parsedDebit) : ''}</td>
-                    <td class="cell-amount" style="color:var(--success)">${r.parsedCredit ? '+' + Utils.formatCurrency(r.parsedCredit) : ''}</td>
+                    <td class="hide-mobile">
+                        <span class="grid-badge" onclick="TransactionManager.filterMsg('${r.category}')" style="cursor:pointer" title="Search all ${r.category}">
+                            ${r.category}
+                        </span>
+                    </td>
+                    <td class="cell-amount" style="color:var(--danger); font-weight:${isOutlier ? '700' : '400'}">
+                        ${r.parsedDebit ? '-' + Utils.formatCurrency(r.parsedDebit) : ''}
+                    </td>
+                    <td class="cell-amount" style="color:var(--success)">
+                        ${r.parsedCredit ? '+' + Utils.formatCurrency(r.parsedCredit) : ''}
+                    </td>
                     <td>
                          <button onclick="TransactionManager.openEditModal('${r.id}')" style="color:var(--text-muted); padding:4px; margin-right:8px; border:none; background:none; cursor:pointer;" title="Edit">
                             <i class="fa-solid fa-pen"></i>
@@ -2239,9 +2412,9 @@ const UIManager = {
             return;
         }
 
-        this.els.varianceList.innerHTML = variance.slice(0, 4).map(v => `
+        this.els.varianceList.innerHTML = variance.slice(0, 4).map(v => Utils.html`
             <div class="variance-item">
-                <span style="font-size:0.85rem; font-weight:500;">${Utils.escapeHtml(v.category)}</span>
+                <span style="font-size:0.85rem; font-weight:500;">${v.category}</span>
                 <span class="badge" style="${v.diff > 0 ? 'background:rgba(239,68,68,0.1); color:var(--danger);' : 'background:rgba(16,185,129,0.1); color:var(--success);'}">
                     ${v.diff > 0 ? '+' : ''}${Utils.formatCurrency(v.diff)}
                 </span>
@@ -2257,7 +2430,7 @@ const UIManager = {
             const pct = Math.min((spent / limit) * 100, 100);
             const color = pct > 90 ? 'var(--danger)' : pct > 70 ? 'var(--warning)' : 'var(--success)';
 
-            return `
+            return Utils.html`
             <div style="margin-bottom: 12px;">
                 <div style="display:flex; justify-content:space-between; font-size:0.75rem; margin-bottom:4px;">
                     <span>${cat}</span>
@@ -2298,28 +2471,28 @@ const UIManager = {
         // Render Categories
         const catList = document.getElementById('categoryRulesList');
         if (catList) {
-            catList.innerHTML = Object.entries(RulesManager.state.categories).map(([cat, keywords]) => `
+            catList.innerHTML = Object.entries(RulesManager.state.categories).map(([cat, keywords]) => Utils.html`
                 <div style="margin-bottom:20px; padding:16px; background:white; border:1px solid var(--border); border-radius:var(--radius-md); box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                         <strong style="font-size:0.9rem; color:var(--text-main); display:flex; align-items:center; gap:10px;">
                             <div style="width:32px; height:32px; border-radius:8px; background:rgba(99,102,241,0.08); display:flex; align-items:center; justify-content:center; color:var(--accent);">
                                 <i class="fa-solid ${Utils.getIconForCategory(cat)}"></i>
                             </div>
-                            ${Utils.escapeHtml(cat)}
+                            ${cat}
                         </strong>
-                        <button data-action="prompt-add-keyword" data-category="${Utils.escapeHtml(cat)}" class="secondary-btn" style="padding:4px 10px; font-size:0.7rem; border-color:rgba(99,102,241,0.2); color:var(--accent);">
+                        <button data-action="prompt-add-keyword" data-category="${cat}" class="secondary-btn" style="padding:4px 10px; font-size:0.7rem; border-color:rgba(99,102,241,0.2); color:var(--accent);">
                             <i class="fa-solid fa-plus" style="font-size:0.6rem;"></i> Add
                         </button>
                     </div>
                     <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                        ${keywords.length ? keywords.map(k => `
+                        ${keywords.length ? keywords.map(k => Utils.html`
                             <span style="background:rgba(99,102,241,0.04); border:1px solid rgba(99,102,241,0.08); padding:4px 10px; border-radius:20px; font-size:0.75rem; color:var(--text-main); display:inline-flex; align-items:center; gap:6px; transition:all 0.2s;" class="keyword-badge">
-                                ${Utils.escapeHtml(k)}
-                                <button data-action="delete-keyword" data-category="${Utils.escapeHtml(cat)}" data-keyword="${Utils.escapeHtml(k)}" style="border:none; background:none; color:var(--danger); cursor:pointer; opacity:0.4; padding:0; display:flex; align-items:center;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.4" title="Remove">
+                                ${k}
+                                <button data-action="delete-keyword" data-category="${cat}" data-keyword="${k}" style="border:none; background:none; color:var(--danger); cursor:pointer; opacity:0.4; padding:0; display:flex; align-items:center;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.4" title="Remove">
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
                             </span>
-                        `).join('') : `<span style="font-size:0.75rem; color:var(--text-muted); font-style:italic;">No keywords defined</span>`}
+                        `).join('') : Utils.safe(`<span style="font-size:0.75rem; color:var(--text-muted); font-style:italic;">No keywords defined</span>`)}
                     </div>
                 </div>
             `).join('');
@@ -2402,20 +2575,38 @@ const UIManager = {
 
     animateValue(obj, val, isCurrency = false) {
         if (!obj) return;
-        const start = 0;
+
+        // Cancel existing animation on this object
+        if (obj._animationFrame) cancelAnimationFrame(obj._animationFrame);
+
         const end = Number(val);
         if (isNaN(end)) return;
-        const duration = 1000;
+
+        // If it's the same value, don't animate (or jump to end)
+        const currentText = obj.textContent.replace(/[^0-9.-]/g, '');
+        const currentVal = Number(currentText) || 0;
+        if (currentVal === end) return;
+
+        const duration = 800; // Slightly faster for responsiveness
         let startTimestamp = null;
+
         const step = (timestamp) => {
             if (!startTimestamp) startTimestamp = timestamp;
             const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-            const current = Math.floor(progress * (end - start) + start);
-            obj.innerHTML = isCurrency ? Utils.formatCurrency(current) : current;
-            if (progress < 1) window.requestAnimationFrame(step);
-            else obj.innerHTML = isCurrency ? Utils.formatCurrency(end) : end;
+            const current = progress * (end - currentVal) + currentVal;
+
+            // Use textContent for safety
+            const formatted = isCurrency ? Utils.formatCurrency(current) : Math.floor(current);
+            obj.textContent = formatted;
+
+            if (progress < 1) {
+                obj._animationFrame = requestAnimationFrame(step);
+            } else {
+                obj.textContent = isCurrency ? Utils.formatCurrency(end) : end;
+                delete obj._animationFrame;
+            }
         };
-        window.requestAnimationFrame(step);
+        obj._animationFrame = requestAnimationFrame(step);
     },
 
     renderGrowthBadge(id, val) {

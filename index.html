@@ -274,75 +274,103 @@
                     </p>
                   </div>
                 </div>
+                <!-- PREDICTIVE ANALYTICS CARD -->
                 <div class="card">
                   <div class="card-header">
                     <h3>
-                      <i class="fa-solid fa-bullseye" style="color: var(--warning)"></i>
-                      Budget Benchmarks
+                      <i class="fa-solid fa-crystal-ball" style="color: #8b5cf6"></i>
+                      Predictive Analytics
                     </h3>
+                    <span id="forecastTrendBadge" class="badge"
+                      style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6">Forecast</span>
                   </div>
-                  <div id="budgetContainer"></div>
+                  <div id="forecastContainer" style="margin-top: 16px">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                      <div class="metric-item"
+                        style="background: #fdf2f8; border: 1px solid #fce7f3; padding: 12px; border-radius: 8px;">
+                        <span class="metric-label" style="color: #be185d; font-size: 0.7rem;">Est. Next Income</span>
+                        <div id="nextIncome" class="metric-value" style="font-size: 1.1rem; color: #be185d;">₹0</div>
+                      </div>
+                      <div class="metric-item"
+                        style="background: #fdf2f8; border: 1px solid #fce7f3; padding: 12px; border-radius: 8px;">
+                        <span class="metric-label" style="color: #be185d; font-size: 0.7rem;">Est. Next Expense</span>
+                        <div id="nextExpense" class="metric-value" style="font-size: 1.1rem; color: #be185d;">₹0</div>
+                      </div>
+                    </div>
+                    <div id="forecastInsight"
+                      style="margin-top: 12px; font-size: 0.8rem; color: var(--text-muted); line-height: 1.5;">
+                      Awaiting more month data for accurate projections...
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div class="card" style="margin-top: 32px">
+              <div class="card" style="margin-top: 20px">
                 <div class="card-header">
                   <h3>
-                    <i class="fa-solid fa-clock-rotate-left" style="color: var(--text-muted)"></i>
-                    Recent Activity
+                    <i class="fa-solid fa-bullseye" style="color: var(--warning)"></i>
+                    Budget Benchmarks
                   </h3>
                 </div>
-                <div style="overflow-x: auto">
-                  <table style="
+                <div id="budgetContainer" style="margin-top: 16px"></div>
+              </div>
+              <div class="card-header">
+                <h3>
+                  <i class="fa-solid fa-clock-rotate-left" style="color: var(--text-muted)"></i>
+                  Recent Activity
+                </h3>
+              </div>
+              <div style="overflow-x: auto">
+                <table style="
                         width: 100%;
                         border-collapse: collapse;
                         margin-top: 10px;
                         font-size: 0.85rem;
                       ">
-                    <thead>
-                      <tr style="
+                  <thead>
+                    <tr style="
                             border-bottom: 1px solid var(--border);
                             color: var(--text-muted);
                             text-align: left;
                           ">
-                        <th style="
+                      <th style="
                               padding: 8px;
                               font-weight: 600;
                               cursor: pointer;
                             " onclick="TransactionManager.handleSort('Date')" role="button" tabindex="0"
-                          aria-label="Sort by Date">
-                          Date <i class="fa-solid fa-sort"></i>
-                        </th>
-                        <th style="padding: 8px; font-weight: 600">
-                          Description
-                        </th>
-                        <th style="
+                        aria-label="Sort by Date">
+                        Date <i class="fa-solid fa-sort"></i>
+                      </th>
+                      <th style="padding: 8px; font-weight: 600">
+                        Description
+                      </th>
+                      <th style="
                               padding: 8px;
                               font-weight: 600;
                               text-align: right;
                               cursor: pointer;
                             " onclick="TransactionManager.handleSort('Amount')" role="button" tabindex="0"
-                          aria-label="Sort by Amount">
-                          Amount <i class="fa-solid fa-sort"></i>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody id="recentActivityList">
-                      <tr>
-                        <td colspan="3" style="
+                        aria-label="Sort by Amount">
+                        Amount <i class="fa-solid fa-sort"></i>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody id="recentActivityList">
+                    <tr>
+                      <td colspan="3" style="
                               text-align: center;
                               padding: 16px;
                               color: var(--text-muted);
                             ">
-                          No recent transactions
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                        No recent transactions
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-              <!-- CREDIT CARD ANALYSIS SECTION -->
-              <div id="creditCardSection" style="
+            </div>
+            <!-- CREDIT CARD ANALYSIS SECTION -->
+            <div id="creditCardSection" style="
                     display: none;
                     margin-top: 20px;
                     background: #fff;
@@ -350,27 +378,27 @@
                     border-radius: 8px;
                     border: 1px solid #e2e8f0;
                   ">
-                <div style="
+              <div style="
                       display: flex;
                       justify-content: space-between;
                       align-items: center;
                       margin-bottom: 15px;
                     ">
-                  <h4 style="
+                <h4 style="
                         margin: 0;
                         color: #b45309;
                         display: flex;
                         align-items: center;
                         gap: 8px;
                       ">
-                    <i class="fa-solid fa-credit-card"></i> Credit Card & Debt
-                    Analysis
-                  </h4>
-                  <button id="btn-cc-details" class="secondary-btn" style="padding: 4px 12px; font-size: 0.75rem">
-                    <i class="fa-solid fa-list"></i> View Transactions
-                  </button>
-                </div>
-                <div style="
+                  <i class="fa-solid fa-credit-card"></i> Credit Card & Debt
+                  Analysis
+                </h4>
+                <button id="btn-cc-details" class="secondary-btn" style="padding: 4px 12px; font-size: 0.75rem">
+                  <i class="fa-solid fa-list"></i> View Transactions
+                </button>
+              </div>
+              <div style="
                       display: grid;
                       grid-template-columns: repeat(
                         auto-fit,
@@ -378,243 +406,217 @@
                       );
                       gap: 15px;
                     ">
-                  <div class="metric-item" style="
+                <div class="metric-item" style="
                         background: #fff7ed;
                         padding: 10px;
                         border-radius: 6px;
                         border: 1px solid #ffedd5;
                       ">
-                    <span class="metric-label" style="color: #9a3412">Total Paid</span>
-                    <div class="metric-value-group">
-                      <span id="ccTotal" class="metric-value" style="color: #c2410c">₹0</span>
-                    </div>
-                  </div>
-                  <div class="metric-item" style="
-                        background: #fff7ed;
-                        padding: 10px;
-                        border-radius: 6px;
-                        border: 1px solid #ffedd5;
-                      ">
-                    <span class="metric-label" style="color: #9a3412">Transactions</span>
-                    <div class="metric-value-group">
-                      <span id="ccCount" class="metric-value" style="color: #c2410c">0</span>
-                    </div>
-                  </div>
-                  <div class="metric-item" style="
-                        background: #fff7ed;
-                        padding: 10px;
-                        border-radius: 6px;
-                        border: 1px solid #ffedd5;
-                      ">
-                    <span class="metric-label" style="color: #9a3412">Avg Payment</span>
-                    <div class="metric-value-group">
-                      <span id="ccAvg" class="metric-value" style="color: #c2410c">₹0</span>
-                    </div>
-                  </div>
-                  <div class="metric-item" style="
-                        background: #fff7ed;
-                        padding: 10px;
-                        border-radius: 6px;
-                        border: 1px solid #ffedd5;
-                      ">
-                    <span class="metric-label" style="color: #9a3412">Max Payment</span>
-                    <div class="metric-value-group">
-                      <span id="ccMax" class="metric-value" style="color: #c2410c">₹0</span>
-                    </div>
+                  <span class="metric-label" style="color: #9a3412">Total Paid</span>
+                  <div class="metric-value-group">
+                    <span id="ccTotal" class="metric-value" style="color: #c2410c">₹0</span>
                   </div>
                 </div>
-                <div id="ccInsights" style="
+                <div class="metric-item" style="
+                        background: #fff7ed;
+                        padding: 10px;
+                        border-radius: 6px;
+                        border: 1px solid #ffedd5;
+                      ">
+                  <span class="metric-label" style="color: #9a3412">Transactions</span>
+                  <div class="metric-value-group">
+                    <span id="ccCount" class="metric-value" style="color: #c2410c">0</span>
+                  </div>
+                </div>
+                <div class="metric-item" style="
+                        background: #fff7ed;
+                        padding: 10px;
+                        border-radius: 6px;
+                        border: 1px solid #ffedd5;
+                      ">
+                  <span class="metric-label" style="color: #9a3412">Avg Payment</span>
+                  <div class="metric-value-group">
+                    <span id="ccAvg" class="metric-value" style="color: #c2410c">₹0</span>
+                  </div>
+                </div>
+                <div class="metric-item" style="
+                        background: #fff7ed;
+                        padding: 10px;
+                        border-radius: 6px;
+                        border: 1px solid #ffedd5;
+                      ">
+                  <span class="metric-label" style="color: #9a3412">Max Payment</span>
+                  <div class="metric-value-group">
+                    <span id="ccMax" class="metric-value" style="color: #c2410c">₹0</span>
+                  </div>
+                </div>
+              </div>
+              <div id="ccInsights" style="
                       margin-top: 10px;
                       font-size: 0.8rem;
                       color: #64748b;
                       font-style: italic;
                     "></div>
-              </div>
             </div>
           </div>
         </div>
-        <!-- End dashboardView -->
+      </div>
+      <!-- End dashboardView -->
 
-        <!-- REPORTS VIEW -->
-        <div id="reportsView" class="view-content" style="display: none">
-          <div class="filter-bar">
-            <div class="filter-group" style="margin-bottom: 20px">
-              <div class="search-box" style="flex: 2">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="filterSearch" placeholder="Search description or UPI ID..." />
-              </div>
-              <div class="search-box" style="flex: 1; padding: 0 12px; height: 42px">
-                <span style="
+      <!-- REPORTS VIEW -->
+      <div id="reportsView" class="view-content" style="display: none">
+        <div class="filter-bar">
+          <div class="filter-group" style="margin-bottom: 20px">
+            <div class="search-box" style="flex: 2">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="filterSearch" placeholder="Search description or UPI ID..." />
+            </div>
+            <div class="search-box" style="flex: 1; padding: 0 12px; height: 42px">
+              <span style="
                       font-size: 0.7rem;
                       color: var(--text-muted);
                       font-weight: 700;
                     ">₹ AMT:</span>
-                <input type="number" id="minAmount" placeholder="Min" class="amt-input" />
-                <span style="color: var(--text-muted)">-</span>
-                <input type="number" id="maxAmount" placeholder="Max" class="amt-input" />
-              </div>
+              <input type="number" id="minAmount" placeholder="Min" class="amt-input" />
+              <span style="color: var(--text-muted)">-</span>
+              <input type="number" id="maxAmount" placeholder="Max" class="amt-input" />
             </div>
+          </div>
 
-            <div style="
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                ">
-              <div class="filter-group">
-                <span style="
+          <div class="filter-actions-row">
+            <div class="filter-group date-group">
+              <span style="
                       font-size: 0.75rem;
                       color: var(--text-muted);
                       font-weight: 600;
                     ">DATE:</span>
-                <input type="date" id="startDate" class="date-input" />
-                <span style="color: var(--text-muted)">to</span>
-                <input type="date" id="endDate" class="date-input" />
-              </div>
-              <div style="display: flex; gap: 10px">
-                <button data-action="filter-preset" data-payload="credit" class="secondary-btn"
-                  style="font-size: 0.7rem; padding: 6px 12px">
-                  Income Only
-                </button>
-                <button data-action="filter-preset" data-payload="debit" class="secondary-btn"
-                  style="font-size: 0.7rem; padding: 6px 12px">
-                  Expenses Only
-                </button>
-                <button data-action="filter-preset" data-payload="admissions" class="secondary-btn" style="
+              <input type="date" id="startDate" class="date-input" />
+              <span style="color: var(--text-muted)">to</span>
+              <input type="date" id="endDate" class="date-input" />
+            </div>
+            <div class="filter-group preset-group">
+              <button data-action="filter-preset" data-payload="credit" class="secondary-btn"
+                style="font-size: 0.7rem; padding: 6px 12px">
+                Income Only
+              </button>
+              <button data-action="filter-preset" data-payload="debit" class="secondary-btn"
+                style="font-size: 0.7rem; padding: 6px 12px">
+                Expenses Only
+              </button>
+              <button data-action="filter-preset" data-payload="admissions" class="secondary-btn" style="
                       font-size: 0.7rem;
                       padding: 6px 12px;
                       color: var(--accent);
                       border-color: var(--accent);
                     ">
-                  Admissions (10k)
-                </button>
-                <button data-action="filter-preset" data-payload="installments" class="secondary-btn" style="
+                Admissions (10k)
+              </button>
+              <button data-action="filter-preset" data-payload="installments" class="secondary-btn" style="
                       font-size: 0.7rem;
                       padding: 6px 12px;
                       color: var(--accent);
                       border-color: var(--accent);
                     ">
-                  Installments (7k)
-                </button>
-                <button data-action="filter-preset" data-payload="high" class="secondary-btn"
-                  style="font-size: 0.7rem; padding: 6px 12px">
-                  High Value
-                </button>
-                <button data-action="filter-preset" data-payload="recurring" class="secondary-btn"
-                  style="font-size: 0.7rem; padding: 6px 12px">
-                  Recurring
-                </button>
-                <button data-action="filter-preset" data-payload="known" class="secondary-btn" style="
+                Installments (7k)
+              </button>
+              <button data-action="filter-preset" data-payload="high" class="secondary-btn"
+                style="font-size: 0.7rem; padding: 6px 12px">
+                High Value
+              </button>
+              <button data-action="filter-preset" data-payload="recurring" class="secondary-btn"
+                style="font-size: 0.7rem; padding: 6px 12px">
+                Recurring
+              </button>
+              <button data-action="filter-preset" data-payload="known" class="secondary-btn" style="
                       font-size: 0.7rem;
                       padding: 6px 12px;
                       border-color: var(--accent);
                     ">
-                  <i class="fa-solid fa-user-tag"></i> Known Persons
-                </button>
-                <button data-action="filter-preset" data-payload="misc" class="secondary-btn"
-                  style="font-size: 0.7rem; padding: 6px 12px">
-                  Uncategorized
-                </button>
-                <button data-action="filter-reset" class="secondary-btn" style="
+                <i class="fa-solid fa-user-tag"></i> Known Persons
+              </button>
+              <button data-action="filter-preset" data-payload="misc" class="secondary-btn"
+                style="font-size: 0.7rem; padding: 6px 12px">
+                Uncategorized
+              </button>
+              <button data-action="filter-reset" class="secondary-btn" style="
                       font-size: 0.7rem;
                       padding: 6px 12px;
                       color: var(--accent);
                     ">
-                  <i class="fa-solid fa-rotate-left"></i> Reset
-                </button>
-              </div>
+                <i class="fa-solid fa-rotate-left"></i> Reset
+              </button>
             </div>
           </div>
+        </div>
 
-          <div id="filterBanner" class="filter-banner" style="
-                display: none;
-                align-items: center;
-                justify-content: space-between;
-                background: rgba(99, 102, 241, 0.1);
-                border: 1px solid rgba(99, 102, 241, 0.2);
-                padding: 12px 20px;
-                border-radius: var(--radius-md);
-                margin-bottom: 20px;
-              ">
-            <div style="display: flex; align-items: center; gap: 12px">
-              <i class="fa-solid fa-filter" style="color: var(--accent)"></i>
-              <span id="filterStatus" style="font-size: 0.85rem; font-weight: 500">Filtering active...</span>
-            </div>
-            <button data-action="filter-reset" class="secondary-btn" style="padding: 4px 12px; font-size: 0.75rem">
-              Clear All
-            </button>
+        <div id="filterBanner" class="filter-banner">
+          <div class="filter-banner-content">
+            <i class="fa-solid fa-filter" style="color: var(--accent)"></i>
+            <span id="filterStatus" class="filter-status-text">Filtering active...</span>
           </div>
+          <button data-action="filter-reset" class="secondary-btn" style="padding: 4px 12px; font-size: 0.75rem">
+            Clear All
+          </button>
+        </div>
 
-          <div id="batchActions" class="filter-banner" style="
-                display: none;
-                align-items: center;
-                justify-content: space-between;
-                background: rgba(239, 68, 68, 0.1);
-                border: 1px solid rgba(239, 68, 68, 0.2);
-                padding: 12px 20px;
-                border-radius: var(--radius-md);
-                margin-bottom: 20px;
-              ">
-            <div style="display: flex; align-items: center; gap: 12px">
-              <i class="fa-solid fa-check-double" style="color: var(--danger)"></i>
-              <span style="
-                    font-size: 0.85rem;
-                    font-weight: 500;
-                    color: var(--danger);
-                  ">Batch Detection Active</span>
-            </div>
-            <button id="deleteSelectedBtn" data-action="delete-selected" class="secondary-btn" style="
+        <div id="batchActions" class="filter-banner batch-banner">
+          <div class="filter-banner-content">
+            <i class="fa-solid fa-check-double" style="color: var(--danger)"></i>
+            <span class="batch-status-text">Batch Detection Active</span>
+          </div>
+          <button id="deleteSelectedBtn" data-action="delete-selected" class="secondary-btn" style="
                   padding: 4px 12px;
                   font-size: 0.75rem;
                   color: var(--danger);
                   border-color: var(--danger);
                 ">
-              Delete Selected
-            </button>
-          </div>
+            Delete Selected
+          </button>
+        </div>
 
-          <div class="table-container">
-            <table id="healthTable">
-              <thead>
-                <tr>
-                  <th style="width: 40px; text-align: center">
-                    <input type="checkbox" id="selectAllCheckbox" onchange="
+        <div class="table-container">
+          <table id="healthTable">
+            <thead>
+              <tr>
+                <th style="width: 40px; text-align: center">
+                  <input type="checkbox" id="selectAllCheckbox" onchange="
                           TransactionManager.toggleSelectAll(this.checked)
                         " />
-                  </th>
-                  <th style="width: 50px" class="hide-mobile">#</th>
-                  <th style="width: 100px; cursor: pointer" onclick="TransactionManager.handleSort('Date')"
-                    role="button" tabindex="0" aria-label="Sort by Date">
-                    Date <i class="fa-solid fa-sort"></i>
-                  </th>
-                  <th style="width: 60px; text-align: center" class="hide-mobile">Type</th>
-                  <th style="cursor: pointer" onclick="TransactionManager.handleSort('Description')" role="button"
-                    tabindex="0" aria-label="Sort by Description">
-                    Description <i class="fa-solid fa-sort"></i>
-                  </th>
-                  <th style="width: 120px; cursor: pointer" class="hide-mobile"
-                    onclick="TransactionManager.handleSort('Category')" role="button" tabindex="0"
-                    aria-label="Sort by Category">
-                    Category <i class="fa-solid fa-sort"></i>
-                  </th>
-                  <th style="text-align: right; width: 120px; cursor: pointer"
-                    onclick="TransactionManager.handleSort('Amount')" role="button" tabindex="0"
-                    aria-label="Sort by Debit">
-                    Debit <i class="fa-solid fa-sort"></i>
-                  </th>
-                  <th style="text-align: right; width: 120px; cursor: pointer"
-                    onclick="TransactionManager.handleSort('Amount')" role="button" tabindex="0"
-                    aria-label="Sort by Credit">
-                    Credit <i class="fa-solid fa-sort"></i>
-                  </th>
-                  <th style="width: 80px">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="tableBody"></tbody>
-            </table>
-          </div>
+                </th>
+                <th style="width: 50px" class="hide-mobile">#</th>
+                <th style="width: 100px; cursor: pointer" onclick="TransactionManager.handleSort('Date')" role="button"
+                  tabindex="0" aria-label="Sort by Date">
+                  Date <i class="fa-solid fa-sort"></i>
+                </th>
+                <th style="width: 60px; text-align: center" class="hide-mobile">Type</th>
+                <th style="cursor: pointer" onclick="TransactionManager.handleSort('Description')" role="button"
+                  tabindex="0" aria-label="Sort by Description">
+                  Description <i class="fa-solid fa-sort"></i>
+                </th>
+                <th style="width: 120px; cursor: pointer" class="hide-mobile"
+                  onclick="TransactionManager.handleSort('Category')" role="button" tabindex="0"
+                  aria-label="Sort by Category">
+                  Category <i class="fa-solid fa-sort"></i>
+                </th>
+                <th style="text-align: right; width: 120px; cursor: pointer"
+                  onclick="TransactionManager.handleSort('Amount')" role="button" tabindex="0"
+                  aria-label="Sort by Debit">
+                  Debit <i class="fa-solid fa-sort"></i>
+                </th>
+                <th style="text-align: right; width: 120px; cursor: pointer"
+                  onclick="TransactionManager.handleSort('Amount')" role="button" tabindex="0"
+                  aria-label="Sort by Credit">
+                  Credit <i class="fa-solid fa-sort"></i>
+                </th>
+                <th style="width: 80px">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
 
-          <!-- PAGINATION -->
-          <div id="paginationControls" style="
+        <!-- PAGINATION -->
+        <div id="paginationControls" style="
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
@@ -622,92 +624,91 @@
                 border-top: 1px solid var(--border);
                 margin-top: 16px;
               ">
-            <span id="pageInfo" style="font-size: 0.85rem; color: var(--text-muted)">Showing 0-0 of 0</span>
-            <div style="display: flex; gap: 8px">
-              <button id="prevPageBtn" class="secondary-btn" style="padding: 6px 12px; font-size: 0.8rem" disabled>
-                Previous
-              </button>
-              <button id="nextPageBtn" class="secondary-btn" style="padding: 6px 12px; font-size: 0.8rem" disabled>
-                Next
-              </button>
-            </div>
+          <span id="pageInfo" style="font-size: 0.85rem; color: var(--text-muted)">Showing 0-0 of 0</span>
+          <div style="display: flex; gap: 8px">
+            <button id="prevPageBtn" class="secondary-btn" style="padding: 6px 12px; font-size: 0.8rem" disabled>
+              Previous
+            </button>
+            <button id="nextPageBtn" class="secondary-btn" style="padding: 6px 12px; font-size: 0.8rem" disabled>
+              Next
+            </button>
           </div>
         </div>
+      </div>
 
-        <!-- RULES VIEW -->
-        <div id="rulesView" class="view-content" style="display: none">
-          <div class="charts-grid">
-            <div class="card">
-              <div class="card-header">
-                <h3>Category Rules</h3>
-                <div style="display: flex; gap: 10px">
-                  <button onclick="TransactionManager.filterMsg('Misc')" class="secondary-btn"
-                    style="padding: 4px 8px; font-size: 0.7rem" title="Show only Misc transactions">
-                    <i class="fa-solid fa-filter"></i> Review Misc
-                  </button>
-                  <button onclick="TransactionManager.reapplyRules()" class="secondary-btn"
-                    style="padding: 4px 8px; font-size: 0.7rem" title="Apply rules to existing data">
-                    <i class="fa-solid fa-arrows-rotate"></i> Re-Apply
-                  </button>
-                  <button data-action="add-rule" data-payload="category" class="primary-btn"
-                    style="padding: 4px 8px; font-size: 0.7rem">
-                    + Add Rule
-                  </button>
-                </div>
+      <!-- RULES VIEW -->
+      <div id="rulesView" class="view-content" style="display: none">
+        <div class="charts-grid">
+          <div class="card">
+            <div class="card-header">
+              <h3>Category Rules</h3>
+              <div style="display: flex; gap: 10px">
+                <button onclick="TransactionManager.filterMsg('Misc')" class="secondary-btn"
+                  style="padding: 4px 8px; font-size: 0.7rem" title="Show only Misc transactions">
+                  <i class="fa-solid fa-filter"></i> Review Misc
+                </button>
+                <button onclick="TransactionManager.reapplyRules()" class="secondary-btn"
+                  style="padding: 4px 8px; font-size: 0.7rem" title="Apply rules to existing data">
+                  <i class="fa-solid fa-arrows-rotate"></i> Re-Apply
+                </button>
+                <button data-action="add-rule" data-payload="category" class="primary-btn"
+                  style="padding: 4px 8px; font-size: 0.7rem">
+                  + Add Rule
+                </button>
               </div>
-              <div id="categoryRulesList" class="rules-list" style="max-height: 300px; overflow-y: auto">
-                <!-- Populated by JS -->
-                <p style="
+            </div>
+            <div id="categoryRulesList" class="rules-list" style="max-height: 300px; overflow-y: auto">
+              <!-- Populated by JS -->
+              <p style="
                       color: var(--text-muted);
                       font-size: 0.8rem;
                       padding: 1rem;
                     ">
-                  Loading rules...
-                </p>
-              </div>
-            </div>
-
-            <div class="card">
-              <div class="card-header">
-                <h3>Known Persons</h3>
-                <button data-action="add-rule" data-payload="person" class="secondary-btn"
-                  style="padding: 4px 8px; font-size: 0.7rem">
-                  + Add Person
-                </button>
-              </div>
-              <div id="personRulesList" class="rules-list" style="max-height: 300px; overflow-y: auto">
-                <!-- Populated by JS -->
-              </div>
+                Loading rules...
+              </p>
             </div>
           </div>
 
-          <div class="card" style="margin-top: 20px">
+          <div class="card">
             <div class="card-header">
-              <h3>Revenue Logic</h3>
+              <h3>Known Persons</h3>
+              <button data-action="add-rule" data-payload="person" class="secondary-btn"
+                style="padding: 4px 8px; font-size: 0.7rem">
+                + Add Person
+              </button>
             </div>
-            <div style="padding: 1rem">
-              <p style="font-size: 0.8rem; color: var(--text-muted)">
-                Define how revenue is identified.
-              </p>
-              <div style="
+            <div id="personRulesList" class="rules-list" style="max-height: 300px; overflow-y: auto">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 20px">
+          <div class="card-header">
+            <h3>Revenue Logic</h3>
+          </div>
+          <div style="padding: 1rem">
+            <p style="font-size: 0.8rem; color: var(--text-muted)">
+              Define how revenue is identified.
+            </p>
+            <div style="
                     display: flex;
                     gap: 10px;
                     margin-top: 10px;
                     align-items: center;
                   ">
-                <label style="font-size: 0.8rem">Admissions (Credit Amount):</label>
-                <input type="number" id="admRuleInput" class="amt-input" placeholder="10000" style="width: 100px" />
-                <button data-action="save-revenue-rule" class="primary-btn"
-                  style="font-size: 0.75rem; padding: 4px 12px">
-                  Save
-                </button>
-              </div>
+              <label style="font-size: 0.8rem">Admissions (Credit Amount):</label>
+              <input type="number" id="admRuleInput" class="amt-input" placeholder="10000" style="width: 100px" />
+              <button data-action="save-revenue-rule" class="primary-btn" style="font-size: 0.75rem; padding: 4px 12px">
+                Save
+              </button>
             </div>
           </div>
         </div>
       </div>
-      <!-- End content-body -->
-    </main>
+  </div>
+  <!-- End content-body -->
+  </main>
   </div>
 
   <div id="loadingOverlay" class="loading-overlay" style="display: none">

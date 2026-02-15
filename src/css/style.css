@@ -1317,6 +1317,14 @@ button:focus,
     }
 }
 
+/* Base style for Category Breakdown container */
+.category-split-container {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    height: 300px;
+}
+
 /* REPORT PREVIEW MODAL */
 .report-modal {
     position: fixed;
@@ -1427,6 +1435,31 @@ button:focus,
 
     .top-bar {
         padding: 12px 20px;
+    }
+
+    /* 3. GRID LAYOUTS - Fix Alignment */
+    .metrics-row {
+        flex-wrap: wrap;
+        /* Allow wrapping */
+        padding: 24px;
+        gap: 16px;
+    }
+
+    .metric-item {
+        flex: 1 1 calc(33.333% - 16px);
+        min-width: 200px;
+    }
+
+    /* Category Breakdown Stacking */
+    .category-split-container {
+        flex-direction: column !important;
+        height: auto !important;
+    }
+
+    .category-split-container>div {
+        width: 100% !important;
+        height: 300px !important;
+        margin-bottom: 20px;
     }
 }
 

@@ -2079,6 +2079,50 @@ const UIManager = {
             });
         });
 
+        // --- Mobile Filter Logic ---
+        document.querySelectorAll('[data-mobile-action="toggle-detail"]').forEach(chip => {
+            chip.addEventListener('click', () => {
+                const type = chip.dataset.payload;
+                const panelId = `mobile${type.charAt(0).toUpperCase() + type.slice(1)}Detail`;
+                const panel = document.getElementById(panelId);
+                const isActive = chip.classList.contains('active');
+
+                // Close all other panels and chips
+                document.querySelectorAll('.mobile-detail-panel').forEach(p => p.classList.remove('active'));
+                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+
+                if (!isActive) {
+                    chip.classList.add('active');
+                    if (panel) panel.classList.add('active');
+                }
+            });
+        });
+
+        // Sync Mobile Inputs to Filter logic
+        document.getElementById('filterSearchMobile').addEventListener('input', Utils.debounce(e => {
+            document.getElementById('filterSearch').value = e.target.value; // Sync with desktop input
+            TransactionManager.filter({ query: e.target.value });
+        }, 300));
+
+        ['minAmountMobile', 'maxAmountMobile'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input', Utils.debounce(e => {
+                const val = e.target.value ? Number(e.target.value) : null;
+                const desktopId = id.replace('Mobile', '');
+                document.getElementById(desktopId).value = e.target.value; // Sync with desktop
+                TransactionManager.filter(id === 'minAmountMobile' ? { min: val } : { max: val });
+            }, 300));
+        });
+
+        ['startDateMobile', 'endDateMobile'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('change', e => {
+                const desktopId = id.replace('Mobile', '');
+                document.getElementById(desktopId).value = e.target.value; // Sync with desktop
+                TransactionManager.filter(id === 'startDateMobile' ? { dateStart: e.target.value } : { dateEnd: e.target.value });
+            });
+        });
+
         // --- Universal Resize Handling ---
         window.addEventListener('resize', Utils.debounce(() => {
             ['mainChart', 'trendChart', 'catChart'].forEach(id => {

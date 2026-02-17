@@ -2659,7 +2659,7 @@ const UIManager = {
     showToast(msg, type = 'info') {
         const t = document.createElement('div');
         t.className = `toast ${type} `;
-        t.innerHTML = `< i class="fa-solid ${type === 'success' ? 'fa-check' : 'fa-info-circle'}" ></i > ${msg} `;
+        t.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-check' : 'fa-info-circle'}"></i> ${msg}`;
         if (!this.els.toastContainer) {
             this.els.toastContainer = document.createElement('div');
             this.els.toastContainer.id = 'toast-container';

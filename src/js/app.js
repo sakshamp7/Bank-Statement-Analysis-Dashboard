@@ -5,19 +5,29 @@ const CONFIG = {
     DB_VERSION: 5,
     // Fallbacks
     DEFAULT_CATEGORY_RULES: {
-        "Food": ["swiggy", "zomato", "restaurant", "cafe", "coffee", "tea", "burger", "pizza", "biryani", "mcdonalds", "kfc", "domino", "eat", "dhaba", "sweet", "baker", "cake", "blinkit", "zepto", "instamart", "bigbasket", "starbucks", "subway", "taco bell", "haldiram", "chaayos"],
+        "Food": ["swiggy", "zomato", "restaurant", "cafe", "coffee", "tea", "burger", "pizza", "biryani", "mcdonalds", "kfc", "domino", "eat", "dhaba", "sweet", "baker", "cake", "blinkit", "zepto", "instamart", "bigbasket", "starbucks", "subway", "taco bell", "haldiram", "chaayos", "burger king", "dining", "lunch", "dinner", "grocery"],
         "Transport": ["uber", "ola", "rapido", "fuel", "petrol", "diesel", "parking", "toll", "metro", "cab", "auto", "ride", "hpcl", "bpcl", "indian oil", "fastag", "yulu", "bounce", "shell", "essar", "nayara", "irctc", "indigo", "air india", "vistara", "akasa", "bus", "train"],
         "Shopping": ["amazon", "flipkart", "myntra", "zara", "h&m", "retail", "store", "fashion", "cloth", "ajio", "decathlon", "nike", "adidas", "puma", "uniqlo", "reliance", "trends", "pantaloons", "westside", "max", "zudio", "mall", "nykaa", "meesho", "dmart", "reliance digital", "croma"],
         "Utilities": ["electricity", "water", "bill", "recharge", "jio", "airtel", "vi", "bsnl", "tatasky", "bescom", "bwssb", "discom", "power", "gas", "cylinder", "indane", "bharatgas", "vodafone", "broadband", "act", "hathway", "excitel", "hotstar", "apple", "google", "ebill"],
         "Medical": ["pharmacy", "doctor", "hospital", "clinic", "med", "health", "lab", "1mg", "apollo", "practo", "netmeds", "diagnostics", "scan", "mri", "x-ray", "dental", "optical", "pathology"],
-        "Rent": ["rent", "landlord", "tolet", "maintenance", "deposit", "broker", "nestaway", "nobroker", "housing"],
-        "Salary": ["salary", "stipend", "payroll", "bonus", "incentive", "arrears"],
+        "Rent": ["rent", "landlord", "tolet", "maintenance", "deposit", "broker", "nestaway", "nobroker", "housing", "brokerage", "lease"],
+        "Salary": ["salary", "stipend", "payroll", "bonus", "incentive", "arrears", "wages", "reimbursement", "refund", "cashback", "interest", "dividend"],
         "Transfer": ["transfer", "neft", "imps", "rtgs", "p2p", "remittance"],
-        "Investment": ["zerodha", "groww", "kite", "sip", "mutual fund", "stocks", "nse", "bse", "coin", "ppf", "fd", "rd", "lic", "insurance", "premium", "upstox", "angel", "tata aia", "hdfc life", "sbi life"],
-        "Education": ["udemy", "coursera", "school", "college", "fee", "tuition", "books", "stationer", "course", "exam", "university", "class", "edx", "skillshare", "khan academy"],
-        "Entertainment": ["bookmyshow", "pvr", "inox", "netflix", "prime", "spotify", "youtube", "disney", "sony", "movie", "cinema", "game", "steam", "playstation", "xbox", "clutter", "nintendo"],
-        "Taxes": ["income tax", "gst", "challan", "tds", "advance tax", "property tax"],
-        "Credit Card": ["sbi card", "card payment", "credit card", "visa", "mastercard", "amex", "card bill", "onecard", "icici credit", "hdfc credit", "axis credit", "kotak credit"]
+        "Investment": ["zerodha", "groww", "kite", "sip", "mutual fund", "stocks", "nse", "bse", "coin"],
+        "Education": ["school", "college", "university", "tuition", "course", "udemy", "coursera", "edx", "skillshare", "books", "stationery", "fee"],
+        "Credit Card": ["credit card", "cc payment", "sbi card", "hdfc card", "icici card", "axis card", "kotak card", "amex", "visa", "mastercard"]
+    },
+    knownPersons: [], // Will be loaded from DB
+    CHART_COLORS: {
+        income: '#10b981',
+        expense: '#ef4444',
+        netFlow: '#6366f1',
+        forecastIncome: '#10b981',
+        forecastExpense: '#ef4444',
+        palette: [
+            '#64748b', '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#f43f5e', '#06b6d4', '#6366f1',
+            '#ec4899', '#84cc16', '#14b8a6', '#f97316'
+        ]
     },
     DEFAULT_KNOWN_PERSONS: [
         "Chandrak", "Chandrakant", "Saksham", "Ankit", "Shalini", "Pratap",
@@ -361,7 +371,7 @@ const RulesManager = {
     state: {
         categories: {},
         persons: [],
-        revenue: { admission: 10000 }
+        revenue: { admission: 10000, installment: 7000 }
     },
     async init() {
         const rules = await DB.getRules();
@@ -371,19 +381,39 @@ const RulesManager = {
 
         if (catRule) {
             this.state.categories = catRule.data;
-            // Merge new defaults
             let changed = false;
+            // Migration: Rename Bills -> Utilities, Health -> Medical
+            if (this.state.categories["Travel"]) {
+                if (!this.state.categories["Transport"]) this.state.categories["Transport"] = [];
+                this.state.categories["Transport"] = [...new Set([...this.state.categories["Transport"], ...this.state.categories["Travel"]])];
+                delete this.state.categories["Travel"];
+                changed = true;
+            }
+            if (this.state.categories["Bills"]) {
+                if (!this.state.categories["Utilities"]) this.state.categories["Utilities"] = [];
+                this.state.categories["Utilities"] = [...new Set([...this.state.categories["Utilities"], ...this.state.categories["Bills"]])];
+                delete this.state.categories["Bills"];
+                changed = true;
+            }
+            if (this.state.categories["Health"]) {
+                if (!this.state.categories["Medical"]) this.state.categories["Medical"] = [];
+                this.state.categories["Medical"] = [...new Set([...this.state.categories["Medical"], ...this.state.categories["Health"]])];
+                delete this.state.categories["Health"];
+                changed = true;
+            }
+
+            // Sync logic: Ensure ALL defaults from CONFIG exist in persistent state
             for (const [cat, keywords] of Object.entries(CONFIG.DEFAULT_CATEGORY_RULES)) {
                 if (!this.state.categories[cat]) {
-                    this.state.categories[cat] = keywords;
+                    this.state.categories[cat] = [...keywords];
                     changed = true;
                 } else {
-                    for (const k of keywords) {
+                    keywords.forEach(k => {
                         if (!this.state.categories[cat].includes(k)) {
                             this.state.categories[cat].push(k);
                             changed = true;
                         }
-                    }
+                    });
                 }
             }
             if (changed) await DB.saveRule({ type: 'category_rules', data: this.state.categories });
@@ -408,8 +438,9 @@ const RulesManager = {
             await DB.saveRule({ type: 'known_persons', data: this.state.persons });
         }
 
-        if (revRule) this.state.revenue = revRule.data;
-        else await DB.saveRule({ type: 'revenue_logic', data: this.state.revenue });
+        if (revRule) {
+            this.state.revenue = { ...this.state.revenue, ...revRule.data };
+        } else await DB.saveRule({ type: 'revenue_logic', data: this.state.revenue });
 
         await this.cleanupRules();
     },
@@ -462,15 +493,17 @@ const RulesManager = {
         return "Misc";
     },
 
-    isFuzzyMatch(s1, s2) {
-        // Very simple fuzzy: check if all words of s2 are in s1 or similar
-        const words2 = s2.split(/\s+/);
-        return words2.every(w => {
-            if (s1.includes(w)) return true;
-            // Basic Jaro-Winkler or just check for 1 char difference if >= 4 chars
-            if (w.length < 4) return false;
-            // Check for 1 char edit distance
-            return this.levenshtein(s1, w) <= 1; // This is slow on whole string s1, better to check against words of s1
+    isFuzzyMatch(desc, keyword) {
+        // Robust fuzzy: check if keyword words match any words in the description with small edit distance
+        const descWords = desc.split(/[\s\-\/\*]+/).filter(w => w.length > 2);
+        const keyWords = keyword.split(/[\s\-\/\*]+/).filter(w => w.length > 1);
+
+        return keyWords.every(kw => {
+            return descWords.some(dw => {
+                if (dw === kw) return true;
+                if (kw.length >= 4 && this.levenshtein(dw, kw) <= 1) return true;
+                return false;
+            });
         });
     },
 
@@ -528,8 +561,9 @@ const RulesManager = {
         await DB.saveRule({ type: 'known_persons', data: this.state.persons });
     },
 
-    async updateRevenueRule(admissionAmt) {
+    async updateRevenueRule(admissionAmt, installmentAmt) {
         this.state.revenue.admission = admissionAmt;
+        this.state.revenue.installment = installmentAmt;
         await DB.saveRule({ type: 'revenue_logic', data: this.state.revenue });
     }
 };
@@ -563,9 +597,10 @@ const TransactionManager = {
             // Re-process all rows
             const updatedRows = this.state.allRows.map(r => {
                 const newCat = RulesManager.categorize(r.Description);
-                // Only update if changed
-                if (newCat !== r.category && r.category !== 'Custom') { // Preserve manual? Maybe not for now based on request
-                    return { ...r, category: newCat };
+                if (newCat !== r.category && r.category !== 'Custom') {
+                    const pDate = r.parsedDate ? new Date(r.parsedDate) : null;
+                    const searchText = (String(r.Description) + " " + newCat + " " + r.parsedCredit + " " + r.parsedDebit + " " + (pDate ? pDate.toISOString().split('T')[0] : "")).toLowerCase();
+                    return { ...r, category: newCat, searchText: searchText };
                 }
                 return r;
             });
@@ -745,7 +780,8 @@ const TransactionManager = {
 
         // Dynamic Credit Card Keywords from RulesManager
         const ccKeywords = RulesManager.state.categories["Credit Card"] || ["sbi card", "card payment", "credit card", "visa", "mastercard", "amex", "card bill"];
-        const admThreshold = (RulesManager.state.revenue && RulesManager.state.revenue.admission) ? RulesManager.state.revenue.admission : 10000;
+        const admThreshold = RulesManager.state.revenue.admission || 10000;
+        const instThreshold = RulesManager.state.revenue.installment || 7000;
 
         rows.forEach(r => {
             const amt = r.parsedDebit || 0;
@@ -772,9 +808,7 @@ const TransactionManager = {
                 m.income += inc;
 
                 const isAdm = Math.abs(inc - admThreshold) < 1;
-                // Simple heuristic for installment: around 7000 (legacy rule) or defined elsewhere? 
-                // Using hardcoded 7000 from original logic for now as simplified rule
-                const isInst = Math.abs(inc - 7000) < 1;
+                const isInst = Math.abs(inc - instThreshold) < 1;
 
                 if (isAdm) {
                     stats.admissions++;
@@ -1079,6 +1113,7 @@ const TransactionManager = {
         const amt = Number(document.getElementById('editTxAmt').value);
 
         if (!desc || isNaN(amt)) return UIManager.showToast("Invalid Input", "error");
+        if (isNaN(new Date(date).getTime())) return UIManager.showToast("Invalid Date", "error");
 
         const txIndex = this.state.allRows.findIndex(r => r.id == id); // loose equality for string/num id mismatch
         if (txIndex === -1) return;
@@ -1176,7 +1211,7 @@ const TransactionManager = {
             const predictions = this.predict(stats.monthly);
             UIManager.update(stats, rows, predictions, recurring);
         } catch (err) {
-            console.error("Sort Error:", err);
+            // console.error("Sort Error:", err);
             UIManager.showToast("Sort failed: " + err.message, "error");
         }
     },
@@ -1227,7 +1262,7 @@ const TransactionManager = {
             UIManager.showToast(`Deleted ${ids.length} transactions`, "success");
 
         } catch (err) {
-            console.error("Batch Delete Error:", err);
+            // console.error("Batch Delete Error:", err);
             UIManager.showToast("Failed to delete transactions", "error");
         } finally {
             UIManager.stopLoading();
@@ -1269,7 +1304,7 @@ const TransactionManager = {
 
         const dataToExport = this.state.filteredRows.length > 0 ? this.state.filteredRows : this.state.allRows;
 
-        if (!dataToExport.length) return alert("No data to export");
+        if (!dataToExport.length) return UIManager.showToast("No data to export", "warning");
 
         // Map back to simplified format for CSV
         const exportData = dataToExport.map(r => ({
@@ -1304,9 +1339,9 @@ const ChartManager = {
             const net = labels.map(k => monthly[k].net);
 
             const traces = [
-                { x: labels, y: income, type: 'area', name: 'Income', line: { color: '#10b981', shape: 'spline' }, fill: 'tozeroy' },
-                { x: labels, y: expense, type: 'area', name: 'Expense', line: { color: '#ef4444', shape: 'spline' }, fill: 'tozeroy' },
-                { x: labels, y: net, type: 'scatter', mode: 'lines+markers', name: 'Net Flow', line: { color: '#6366f1', width: 3 } }
+                { x: labels, y: income, type: 'area', name: 'Income', line: { color: CONFIG.CHART_COLORS.income, shape: 'spline' }, fill: 'tozeroy' },
+                { x: labels, y: expense, type: 'area', name: 'Expense', line: { color: CONFIG.CHART_COLORS.expense, shape: 'spline' }, fill: 'tozeroy' },
+                { x: labels, y: net, type: 'scatter', mode: 'lines+markers', name: 'Net Flow', line: { color: CONFIG.CHART_COLORS.netFlow, width: 3 } }
             ];
 
             if (predictions) {
@@ -1321,14 +1356,14 @@ const ChartManager = {
                     x: [labels[labels.length - 1], nextLabel],
                     y: [income[income.length - 1], predictions.nextMonthIncome],
                     type: 'scatter', mode: 'lines', name: 'Forecast Income',
-                    line: { color: '#10b981', dash: 'dot', width: 2 },
+                    line: { color: CONFIG.CHART_COLORS.forecastIncome, dash: 'dot', width: 2 },
                     showlegend: false
                 });
                 traces.push({
                     x: [labels[labels.length - 1], nextLabel],
                     y: [expense[expense.length - 1], predictions.nextMonthExpense],
                     type: 'scatter', mode: 'lines', name: 'Forecast Expense',
-                    line: { color: '#ef4444', dash: 'dot', width: 2 },
+                    line: { color: CONFIG.CHART_COLORS.forecastExpense, dash: 'dot', width: 2 },
                     showlegend: false
                 });
             }
@@ -1346,7 +1381,7 @@ const ChartManager = {
 
             Plotly.newPlot('mainChart', traces, layout, { displayModeBar: false, responsive: true });
         } catch (err) {
-            console.error("Main Chart Render Error:", err);
+            // console.error("Main Chart Render Error:", err);
             document.getElementById('mainChart').innerHTML = `<div class="chart-error">Chart Rendering Error: ${err.message}</div>`;
         }
     },
@@ -1362,10 +1397,8 @@ const ChartManager = {
         }
 
         // Professional Palette (Slate, Blue, Emerald, Violet, Amber, Rose, Cyan, Indigo)
-        const palette = [
-            '#64748b', '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#f43f5e', '#06b6d4', '#6366f1',
-            '#ec4899', '#84cc16', '#14b8a6', '#f97316'
-        ];
+        // Professional Palette (Slate, Blue, Emerald, Violet, Amber, Rose, Cyan, Indigo)
+        const palette = CONFIG.CHART_COLORS.palette;
         // Cycle colors if more labels than palette
         const colors = labels.map((_, i) => palette[i % palette.length]);
 
@@ -1401,7 +1434,7 @@ const ChartManager = {
                 });
             });
         } catch (err) {
-            console.error("Category Chart Render Error:", err);
+            // console.error("Category Chart Render Error:", err);
             document.getElementById('catChart').innerHTML = `<div class="chart-error">${err.message}</div>`;
         }
 
@@ -1417,7 +1450,7 @@ const ChartManager = {
             const color = colors[i];
 
             return `
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; font-size:0.85rem; padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05); cursor:pointer;" onclick="TransactionManager.filter({ query: '${label}' }); UIManager.switchView('reportsView'); document.getElementById('filterSearch').value = '${label}';">
+                <div role="button" tabindex="0" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; font-size:0.85rem; padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05); cursor:pointer;" onclick="TransactionManager.filter({ query: '${label}' }); UIManager.switchView('reportsView'); document.getElementById('filterSearch').value = '${label}';">
                     <div style="display:flex; align-items:center; gap:8px;">
                         <div style="width:10px; height:10px; border-radius:3px; background:${color};"></div>
                         <span style="font-weight:500; color:var(--text-main);">${Utils.escapeHtml(label)}</span>
@@ -1442,7 +1475,7 @@ const ChartManager = {
             y: net,
             type: 'bar',
             marker: {
-                color: net.map(v => v >= 0 ? '#10b981' : '#ef4444')
+                color: net.map(v => v >= 0 ? CONFIG.CHART_COLORS.income : CONFIG.CHART_COLORS.expense)
             }
         };
 
@@ -1456,7 +1489,7 @@ const ChartManager = {
         try {
             Plotly.newPlot('trendChart', [trace], layout, { displayModeBar: false, responsive: true });
         } catch (err) {
-            console.error("Trend Chart Render Error:", err);
+            // console.error("Trend Chart Render Error:", err);
             document.getElementById('trendChart').innerHTML = `<div class="chart-error">${err.message}</div>`;
         }
     }
@@ -1923,7 +1956,7 @@ const UIManager = {
     },
 
     bindEvents() {
-        document.addEventListener('click', e => {
+        document.addEventListener('click', async e => {
             const btn = e.target.closest('[data-action]');
             if (!btn) return;
             const action = btn.dataset.action;
@@ -1989,12 +2022,13 @@ const UIManager = {
                 }
             }
             if (action === 'save-revenue-rule') {
-                const val = document.getElementById('admRuleInput').value;
-                if (!Utils.isValidAmount(val)) return UIManager.showToast("Please enter a valid positive amount", "error");
-
-                RulesManager.state.revenue.admission = Number(val);
-                DB.saveRule({ type: 'revenue_logic', data: RulesManager.state.revenue });
-                UIManager.showToast("Revenue logic saved", "success");
+                const admVal = parseInt(document.getElementById('admRuleInput').value);
+                const instVal = parseInt(document.getElementById('instRuleInput').value);
+                if (!isNaN(admVal) && !isNaN(instVal)) {
+                    await RulesManager.updateRevenueRule(admVal, instVal);
+                    UIManager.showToast("Revenue rules updated!", "success");
+                    // Re-apply if user wants? Or just notifying them.
+                }
             }
             if (action === 'delete-person') {
                 if (confirm(`Remove "${payload}" from known persons?`)) {
@@ -2475,13 +2509,13 @@ const UIManager = {
             const color = pct > 90 ? 'var(--danger)' : pct > 70 ? 'var(--warning)' : 'var(--success)';
 
             return Utils.html`
-            <div style="margin-bottom: 12px;">
-                <div style="display:flex; justify-content:space-between; font-size:0.75rem; margin-bottom:4px;">
+            <div class="budget-item">
+                <div class="budget-header">
                     <span>${cat}</span>
                     <span>${Utils.formatCurrency(spent)} / ${Utils.formatCurrency(limit)}</span>
                 </div>
-                <div style="height:6px; background:#f1f5f9; border-radius:3px; overflow:hidden;">
-                    <div style="width:${pct}%; height:100%; background:${color}; border-radius:3px;"></div>
+                <div class="budget-track">
+                    <div class="budget-fill" style="width:${pct}%; background:${color};"></div>
                 </div>
             </div>
             `;
@@ -2498,14 +2532,14 @@ const UIManager = {
         // History Modal
         this.els.historyList.innerHTML = datasets.map(d => `
             <tr>
-                <td style="padding:8px;">${new Date(d.uploadDate).toLocaleDateString()}</td>
-                <td style="padding:8px;">${d.name}</td>
-                <td style="padding:8px;">${d.rowCount}</td>
-                <td style="padding:8px; text-align:right;">
-                    <button data-action="delete-dataset" data-payload="${d.id}" style="color:var(--danger); border:none; background:none; cursor:pointer;">
+                <td class="dataset-cell">${new Date(d.uploadDate).toLocaleDateString()}</td>
+                <td class="dataset-cell">${d.name}</td>
+                <td class="dataset-cell">${d.rowCount}</td>
+                <td class="dataset-cell dataset-actions">
+                    <button data-action="delete-dataset" data-payload="${d.id}" class="btn-icon danger">
                         <i class="fa-solid fa-trash"></i>
                     </button>
-                    ${d.id !== currentId ? `<button style="color:var(--accent); border:none; background:none; cursor:pointer;" onclick="TransactionManager.switchDataset('${d.id}')">Load</button>` : '<span style="font-size:0.7rem; color:var(--success);">Active</span>'}
+                    ${d.id !== currentId ? `<button class="btn-icon accent" onclick="TransactionManager.switchDataset('${d.id}')">Load</button>` : '<span class="dataset-active">Active</span>'}
                 </td>
             </tr>
         `).join('');
@@ -2516,27 +2550,25 @@ const UIManager = {
         const catList = document.getElementById('categoryRulesList');
         if (catList) {
             catList.innerHTML = Object.entries(RulesManager.state.categories).map(([cat, keywords]) => Utils.html`
-                <div style="margin-bottom:20px; padding:16px; background:white; border:1px solid var(--border); border-radius:var(--radius-md); box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                        <strong style="font-size:0.9rem; color:var(--text-main); display:flex; align-items:center; gap:10px;">
-                            <div style="width:32px; height:32px; border-radius:8px; background:rgba(99,102,241,0.08); display:flex; align-items:center; justify-content:center; color:var(--accent);">
-                                <i class="fa-solid ${Utils.getIconForCategory(cat)}"></i>
-                            </div>
+                <div class="rule-card">
+                    <div class="rule-header">
+                        <strong class="rule-title">
+                            <i class="fa-solid ${Utils.getIconForCategory(cat)}"></i>
                             ${cat}
                         </strong>
-                        <button data-action="prompt-add-keyword" data-category="${cat}" class="secondary-btn" style="padding:4px 10px; font-size:0.7rem; border-color:rgba(99,102,241,0.2); color:var(--accent);">
-                            <i class="fa-solid fa-plus" style="font-size:0.6rem;"></i> Add
+                        <button data-action="prompt-add-rule" data-payload="category" data-category="${cat}" class="secondary-btn rule-add-btn">
+                            <i class="fa-solid fa-plus" style="font-size:0.6rem;"></i>
                         </button>
                     </div>
-                    <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                        ${keywords.length ? keywords.map(k => Utils.html`
-                            <span style="background:rgba(99,102,241,0.04); border:1px solid rgba(99,102,241,0.08); padding:4px 10px; border-radius:20px; font-size:0.75rem; color:var(--text-main); display:inline-flex; align-items:center; gap:6px; transition:all 0.2s;" class="keyword-badge">
+                    <div class="rule-keywords-simple">
+                        ${keywords.length ? Utils.safe(keywords.sort().map((k, i) => Utils.html`
+                            <span class="simple-keyword">
                                 ${k}
-                                <button data-action="delete-keyword" data-category="${cat}" data-keyword="${k}" style="border:none; background:none; color:var(--danger); cursor:pointer; opacity:0.4; padding:0; display:flex; align-items:center;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.4" title="Remove">
+                                <button data-action="delete-keyword" data-category="${cat}" data-keyword="${k}" class="simple-keyword-remove" title="Remove">
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
-                            </span>
-                        `).join('') : Utils.safe(`<span style="font-size:0.75rem; color:var(--text-muted); font-style:italic;">No keywords defined</span>`)}
+                            </span>${i < keywords.length - 1 ? ', ' : ''}
+                        `).join('')) : Utils.safe(`<span class="rules-empty">No keywords defined</span>`)}
                     </div>
                 </div>
             `).join('');
@@ -2545,15 +2577,38 @@ const UIManager = {
         // Render Persons
         const perList = document.getElementById('personRulesList');
         if (perList) {
-            perList.innerHTML = RulesManager.state.persons.map(p => `
-                <span style="display:inline-flex; align-items:center; background:rgba(99,102,241,0.1); color:var(--accent); padding:4px 8px; border-radius:4px; font-size:0.75rem; margin:0 4px 4px 0;">
-                    ${Utils.escapeHtml(p)}
-                    <button data-action="delete-person" data-payload="${Utils.escapeHtml(p)}" style="border:none; background:none; color:var(--accent); cursor:pointer; margin-left:6px; font-size:0.7rem; padding:0; display:flex; align-items:center opacity:0.6;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6" title="Remove">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
-                </span>
-            `).join('');
+            perList.innerHTML = Utils.html`
+                <div class="rule-card">
+                    <div class="rule-header">
+                        <strong class="rule-title">
+                            <div class="rule-icon">
+                                <i class="fa-solid fa-users"></i>
+                            </div>
+                            Known Persons
+                        </strong>
+                        <button data-action="prompt-add-rule" data-payload="person" class="secondary-btn rule-add-btn">
+                            <i class="fa-solid fa-plus" style="font-size:0.6rem;"></i> Add
+                        </button>
+                    </div>
+                    <div class="rule-keywords-simple">
+                        ${Utils.safe(RulesManager.state.persons.sort().map((p, i) => Utils.html`
+                            <span class="simple-keyword">
+                                ${Utils.escapeHtml(p)}
+                                <button data-action="delete-person" data-payload="${Utils.escapeHtml(p)}" class="simple-keyword-remove" title="Remove">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </span>${i < RulesManager.state.persons.length - 1 ? ', ' : ''}
+                        `).join(''))}
+                    </div>
+                </div>
+            `;
         }
+
+        // Set Revenue Inputs Constants
+        const admInp = document.getElementById('admRuleInput');
+        const instInp = document.getElementById('instRuleInput');
+        if (admInp) admInp.value = RulesManager.state.revenue.admission;
+        if (instInp) instInp.value = RulesManager.state.revenue.installment;
     },
 
     promptAddRule(type) {
@@ -2597,14 +2652,14 @@ const UIManager = {
     showProgress(percent, msg) {
         const progressBar = document.getElementById('progressBar');
         const loadingText = document.getElementById('loadingText');
-        if (progressBar) progressBar.style.width = `${percent}%`;
+        if (progressBar) progressBar.style.width = `${percent}% `;
         if (loadingText && msg) loadingText.textContent = `${msg} (${Math.round(percent)}%)`;
     },
 
     showToast(msg, type = 'info') {
         const t = document.createElement('div');
-        t.className = `toast ${type}`;
-        t.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-check' : 'fa-info-circle'}"></i> ${msg}`;
+        t.className = `toast ${type} `;
+        t.innerHTML = `< i class="fa-solid ${type === 'success' ? 'fa-check' : 'fa-info-circle'}" ></i > ${msg} `;
         if (!this.els.toastContainer) {
             this.els.toastContainer = document.createElement('div');
             this.els.toastContainer.id = 'toast-container';
@@ -2663,8 +2718,8 @@ const UIManager = {
             return;
         }
         const isPos = num > 0;
-        el.innerHTML = `${isPos ? '+' : ''}${num}%`;
-        el.className = `metric-badge ${isPos ? 'positive' : 'negative'}`;
+        el.innerHTML = `${isPos ? '+' : ''}${num}% `;
+        el.className = `metric - badge ${isPos ? 'positive' : 'negative'} `;
         el.style.color = isPos ? 'var(--success)' : 'var(--danger)';
         el.style.background = isPos ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
     },
@@ -2677,13 +2732,17 @@ const UIManager = {
         const prevBtn = document.getElementById('prevPageBtn');
         const nextBtn = document.getElementById('nextPageBtn');
 
-        if (infoEl) infoEl.textContent = `Showing ${Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)}-${Math.min(currentPage * itemsPerPage, totalItems)} of ${totalItems}`;
+        if (infoEl) infoEl.textContent = `Showing ${Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} -${Math.min(currentPage * itemsPerPage, totalItems)} of ${totalItems} `;
 
         if (prevBtn) {
             prevBtn.disabled = currentPage === 1;
             prevBtn.onclick = () => {
                 TransactionManager.state.pagination.currentPage--;
-                UIManager.update(TransactionManager.analyze(TransactionManager.state.filteredRows), TransactionManager.state.filteredRows, TransactionManager.detectRecurring(TransactionManager.state.filteredRows));
+                const rows = TransactionManager.state.filteredRows;
+                const stats = TransactionManager.analyze(rows);
+                const recurring = TransactionManager.detectRecurring(rows);
+                const predictions = TransactionManager.predict(stats.monthly);
+                UIManager.update(stats, rows, predictions, recurring);
             };
         }
 
@@ -2691,7 +2750,11 @@ const UIManager = {
             nextBtn.disabled = currentPage === totalPages || totalItems === 0;
             nextBtn.onclick = () => {
                 TransactionManager.state.pagination.currentPage++;
-                UIManager.update(TransactionManager.analyze(TransactionManager.state.filteredRows), TransactionManager.state.filteredRows, TransactionManager.detectRecurring(TransactionManager.state.filteredRows));
+                const rows = TransactionManager.state.filteredRows;
+                const stats = TransactionManager.analyze(rows);
+                const recurring = TransactionManager.detectRecurring(rows);
+                const predictions = TransactionManager.predict(stats.monthly);
+                UIManager.update(stats, rows, predictions, recurring);
             };
         }
     }
@@ -2750,7 +2813,7 @@ const CommandManager = {
                 .map(r => ({
                     id: 'tx-' + r.id,
                     label: `Search: "${r.Description}"`,
-                    desc: `${Utils.formatCurrency(r.parsedDebit || r.parsedCredit)} - ${r.category || 'Uncategorized'}`, // Added category to description
+                    desc: `${Utils.formatCurrency(r.parsedDebit || r.parsedCredit)} - ${r.category || 'Uncategorized'} `, // Added category to description
                     icon: 'fa-search',
                     action: () => {
                         UIManager.switchView('reportsView');
@@ -2768,22 +2831,22 @@ const CommandManager = {
     render() {
         const list = document.getElementById('cmdList');
         if (this.matches.length === 0) {
-            list.innerHTML = `<div style="padding:10px; color:var(--text-muted); font-size:0.8rem;">No results found.</div>`;
+            list.innerHTML = `< div style = "padding:10px; color:var(--text-muted); font-size:0.8rem;" > No results found.</div > `;
             return;
         }
 
         list.innerHTML = this.matches.map((c, i) => `
-            <div class="cmd-item ${i === this.selectedIndex ? 'selected' : ''}" onclick="CommandManager.execute(${i})">
-                <div style="display:flex; align-items:center;">
-                    <div class="cmd-icon"><i class="fa-solid ${c.icon}"></i></div>
-                    <div>
-                        <div style="font-weight:500;">${c.label}</div>
-                        ${c.desc ? `<div class="cmd-desc">${c.desc}</div>` : ''}
+                < div class="cmd-item ${i === this.selectedIndex ? 'selected' : ''}" onclick = "CommandManager.execute(${i})" >
+                    <div style="display:flex; align-items:center;">
+                        <div class="cmd-icon"><i class="fa-solid ${c.icon}"></i></div>
+                        <div>
+                            <div style="font-weight:500;">${c.label}</div>
+                            ${c.desc ? `<div class="cmd-desc">${c.desc}</div>` : ''}
+                        </div>
                     </div>
-                </div>
                 ${i === this.selectedIndex ? '<i class="fa-solid fa-turn-down" style="font-size:0.7rem;"></i>' : ''}
-            </div>
-        `).join('');
+            </div >
+    `).join('');
 
         // Ensure selected is visible
         const selectedEl = list.children[this.selectedIndex];
@@ -2818,12 +2881,13 @@ const CommandManager = {
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("Finance Dashboard Pro v3.0 Initializing...");
+    // console.log("Finance Dashboard Pro v3.0 Initializing...");
     try {
         UIManager.init();
         CommandManager.init(); // Initialize Smart Search
         await TransactionManager.init();
     } catch (err) {
-        console.error("Initialization Failed:", err);
+        // console.error("Initialization Failed:", err);
+        UIManager.showToast("Application failed to initialize: " + err.message, "error");
     }
 });

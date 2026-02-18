@@ -325,10 +325,26 @@ const DB = {
         return new Promise((resolve, reject) => {
             const tx = db.transaction(CONFIG.STORE_NAME, "readonly");
             const store = tx.objectStore(CONFIG.STORE_NAME);
-            const index = store.index("datasetId");
-            const req = index.getAll(IDBKeyRange.only(datasetId));
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => reject(req.error);
+            const indexNames = Array.from(store.indexNames || []);
+            if (indexNames.includes('datasetId')) {
+                const index = store.index("datasetId");
+                const req = index.getAll(IDBKeyRange.only(datasetId));
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            } else {
+                // Index missing in existing DB schema — fallback to scanning all records
+                const req = store.getAll();
+                req.onsuccess = () => {
+                    try {
+                        const rows = req.result || [];
+                        const filtered = rows.filter(r => r && r.datasetId === datasetId);
+                        resolve(filtered);
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+                req.onerror = () => reject(req.error);
+            }
         });
     },
 
@@ -336,15 +352,30 @@ const DB = {
         return this.performTransaction([CONFIG.STORE_NAME, "datasets"], "readwrite", (tx) => {
             tx.objectStore("datasets").delete(datasetId);
             const txnStore = tx.objectStore(CONFIG.STORE_NAME);
-            const index = txnStore.index("datasetId");
-            const req = index.openKeyCursor(IDBKeyRange.only(datasetId));
-            req.onsuccess = (e) => {
-                const cursor = e.target.result;
-                if (cursor) {
-                    cursor.delete();
-                    cursor.continue();
-                }
-            };
+            const indexNames = Array.from(txnStore.indexNames || []);
+            if (indexNames.includes('datasetId')) {
+                const index = txnStore.index("datasetId");
+                const req = index.openKeyCursor(IDBKeyRange.only(datasetId));
+                req.onsuccess = (e) => {
+                    const cursor = e.target.result;
+                    if (cursor) {
+                        cursor.delete();
+                        cursor.continue();
+                    }
+                };
+            } else {
+                // Fallback: scan all records and delete those matching datasetId
+                const req = txnStore.openCursor();
+                req.onsuccess = (e) => {
+                    const cursor = e.target.result;
+                    if (cursor) {
+                        try {
+                            if (cursor.value && cursor.value.datasetId === datasetId) cursor.delete();
+                        } catch (err) { /* ignore malformed records */ }
+                        cursor.continue();
+                    }
+                };
+            }
         });
     },
 
@@ -1791,7 +1822,8 @@ const ReportManager = {
 
     showPreview(htmlContent) {
         // cleanup existing
-        if (document.getElementById('report-modal')) document.body.removeChild(document.getElementById('report-modal'));
+        const existingReportModal = document.getElementById('report-modal');
+        if (existingReportModal) document.body.removeChild(existingReportModal);
 
         const modal = document.createElement('div');
         modal.id = 'report-modal';
@@ -1856,11 +1888,13 @@ const ReportManager = {
         document.body.appendChild(modal);
 
         // Bind Events
-        document.getElementById('btn-close-pdf').onclick = () => {
+        const btnClosePdf = document.getElementById('btn-close-pdf');
+        if (btnClosePdf) btnClosePdf.onclick = () => {
             document.body.removeChild(modal);
         };
 
-        document.getElementById('btn-download-pdf').onclick = async () => {
+        const btnDownloadPdf = document.getElementById('btn-download-pdf');
+        if (btnDownloadPdf) btnDownloadPdf.onclick = async () => {
             const btn = document.getElementById('btn-download-pdf');
             const originalText = btn.innerHTML;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
@@ -1963,9 +1997,21 @@ const UIManager = {
             const payload = btn.dataset.payload;
 
             if (action === 'navigate') this.switchView(payload, btn);
+            if (action === 'refresh-summary') {
+                // Re-process current filtered rows to refresh charts & metrics
+                try {
+                    const rows = TransactionManager.state.filteredRows.length ? TransactionManager.state.filteredRows : TransactionManager.state.allRows;
+                    TransactionManager.process(rows);
+                    const last = new Date().toLocaleString();
+                    const el = document.getElementById('summaryLastUpdated');
+                    if (el) el.textContent = last;
+                    UIManager.showToast('Summary refreshed', 'success');
+                } catch (err) {
+                    UIManager.showToast('Failed to refresh summary', 'error');
+                }
+            }
             if (action === 'switch-tab') this.handleTabSwitch(payload, btn);
             if (action === 'import') this.els.fileInput.click();
-            if (action === 'export-csv') TransactionManager.exportCSV();
             if (action === 'export-csv') TransactionManager.exportCSV();
             if (action === 'export-pdf') ReportManager.generatePDF();
             if (action === 'delete-selected') {
@@ -2004,6 +2050,26 @@ const UIManager = {
                 } else if (payload === 'keyword') {
                     // Legacy handler if needed
                 } else {
+                    this.promptAddRule(payload, btn.dataset.category);
+                }
+            }
+            if (action === 'prompt-add-rule') {
+                const cat = btn.dataset.category;
+                if (cat) {
+                    // Adding keyword to existing category
+                    const keyword = prompt(`Add keyword to "${cat}":`);
+                    if (keyword && keyword.trim()) {
+                        RulesManager.addCategoryRule(cat, keyword.trim().toLowerCase()).then(success => {
+                            if (success) {
+                                this.renderRules();
+                                UIManager.showToast(`Keyword "${keyword}" added to ${cat}`, "success");
+                            } else {
+                                UIManager.showToast("Keyword already exists in this category", "warning");
+                            }
+                        });
+                    }
+                } else {
+                    // Creating new category
                     this.promptAddRule(payload);
                 }
             }
@@ -2056,14 +2122,19 @@ const UIManager = {
             if (action === 'delete-dataset') TransactionManager.deleteDataset(payload);
         });
 
-        this.els.fileInput.addEventListener('change', e => {
-            if (e.target.files.length) TransactionManager.importData(e.target.files[0]);
-        });
+        if (this.els.fileInput) {
+            this.els.fileInput.addEventListener('change', e => {
+                if (e.target.files.length) TransactionManager.importData(e.target.files[0]);
+            });
+        }
 
         // Filter Inputs
-        document.getElementById('filterSearch').addEventListener('input', Utils.debounce(e => {
-            TransactionManager.filter({ query: e.target.value });
-        }, 300));
+        const filterSearchEl = document.getElementById('filterSearch');
+        if (filterSearchEl) {
+            filterSearchEl.addEventListener('input', Utils.debounce(e => {
+                TransactionManager.filter({ query: e.target.value });
+            }, 300));
+        }
 
         ['minAmount', 'maxAmount'].forEach(id => {
             const el = document.getElementById(id);
@@ -2080,9 +2151,11 @@ const UIManager = {
             });
         });
 
-        this.els.datasetList.addEventListener('change', e => {
-            if (e.target.value) TransactionManager.switchDataset(e.target.value);
-        });
+        if (this.els.datasetList) {
+            this.els.datasetList.addEventListener('change', e => {
+                if (e.target.value) TransactionManager.switchDataset(e.target.value);
+            });
+        }
 
         // --- Mobile Menu Logic ---
         const mobileBtn = document.getElementById('mobileMenuBtn');
@@ -2133,10 +2206,14 @@ const UIManager = {
         });
 
         // Sync Mobile Inputs to Filter logic
-        document.getElementById('filterSearchMobile').addEventListener('input', Utils.debounce(e => {
-            document.getElementById('filterSearch').value = e.target.value; // Sync with desktop input
-            TransactionManager.filter({ query: e.target.value });
-        }, 300));
+        const filterSearchMobileEl = document.getElementById('filterSearchMobile');
+        if (filterSearchMobileEl) {
+            filterSearchMobileEl.addEventListener('input', Utils.debounce(e => {
+                const desktop = document.getElementById('filterSearch');
+                if (desktop) desktop.value = e.target.value; // Sync with desktop input
+                TransactionManager.filter({ query: e.target.value });
+            }, 300));
+        }
 
         ['minAmountMobile', 'maxAmountMobile'].forEach(id => {
             const el = document.getElementById(id);
@@ -2385,7 +2462,8 @@ const UIManager = {
         `;
 
         document.body.appendChild(modal);
-        document.getElementById('close-cc-modal').onclick = () => document.body.removeChild(modal);
+        const closeCc = document.getElementById('close-cc-modal');
+        if (closeCc) closeCc.onclick = () => document.body.removeChild(modal);
 
         // Close on outside click
         modal.onclick = (e) => {
@@ -2611,12 +2689,28 @@ const UIManager = {
         if (instInp) instInp.value = RulesManager.state.revenue.installment;
     },
 
-    promptAddRule(type) {
+    promptAddRule(type, existingCategory) {
         if (type === 'category') {
-            const cat = prompt("Enter Category Name (e.g., Food):");
-            if (!cat) return;
-            const keyword = prompt("Enter Key Phrase to match:");
-            if (cat && keyword) RulesManager.addCategoryRule(cat, keyword.toLowerCase()).then(() => this.renderRules());
+            if (existingCategory) {
+                // Adding keyword to existing category
+                const keyword = prompt(`Add keyword to "${existingCategory}":`);
+                if (keyword && keyword.trim()) {
+                    RulesManager.addCategoryRule(existingCategory, keyword.trim().toLowerCase()).then(success => {
+                        if (success) {
+                            this.renderRules();
+                            UIManager.showToast(`Keyword "${keyword}" added to ${existingCategory}`, "success");
+                        } else {
+                            UIManager.showToast("Keyword already exists in this category", "warning");
+                        }
+                    });
+                }
+            } else {
+                // Creating new category
+                const cat = prompt("Enter Category Name (e.g., Food):");
+                if (!cat) return;
+                const keyword = prompt("Enter Key Phrase to match:");
+                if (cat && keyword) RulesManager.addCategoryRule(cat, keyword.toLowerCase()).then(() => this.renderRules());
+            }
         } else if (type === 'person') {
             const name = prompt("Enter Person Name:");
             if (name) RulesManager.addPerson(name).then(() => this.renderRules());
@@ -2785,16 +2879,20 @@ const CommandManager = {
         });
 
         const debouncedSearch = Utils.debounce((e) => this.search(e.target.value), 300);
-        document.getElementById('cmdInput').addEventListener('input', debouncedSearch);
+        const cmdInputEl = document.getElementById('cmdInput');
+        if (cmdInputEl) cmdInputEl.addEventListener('input', debouncedSearch);
     },
 
     toggle() {
         this.isOpen = !this.isOpen;
         const el = document.getElementById('commandPalette');
-        el.style.display = this.isOpen ? 'flex' : 'none';
+        if (el) el.style.display = this.isOpen ? 'flex' : 'none';
         if (this.isOpen) {
-            document.getElementById('cmdInput').value = '';
-            document.getElementById('cmdInput').focus();
+            const inEl = document.getElementById('cmdInput');
+            if (inEl) {
+                inEl.value = '';
+                inEl.focus();
+            }
             this.search('');
         }
     },
